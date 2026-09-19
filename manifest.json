@@ -1,0 +1,16 @@
+{
+  "name": "車両移動ツール（効率化８）",
+  "short_name": "車両移動",
+  "description": "さぬきシェアサイクル 在庫取込・自動配分・ルート地図ツール",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f6f5f0",
+  "theme_color": "#6c3483",
+  "lang": "ja",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
