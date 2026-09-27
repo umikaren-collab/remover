@@ -1,7 +1,7 @@
 // 車両移動ツール - Service Worker
 // バージョンを上げる（v1→v2…）たびに、スマホ側は自動で新しいファイルを取りに行きます。
 // ここを書き換えずに index.html だけ差し替えても更新は反映されないので注意。
-const CACHE_NAME = 'shsac-vehicle-tool-v1';
+const CACHE_NAME = 'shsac-vehicle-tool-v2-live-inventory';
 const APP_SHELL = [
   './',
   './index.html',

@@ -339,6 +339,17 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
     </div>
     <div id="paste-body" style="display: block;">
       <div class="card-body">
+        <div style="padding:12px;border:1px solid var(--border-l);border-radius:var(--r8);margin-bottom:14px;background:var(--gray-ll)">
+          <button type="button" class="btn btn-blue" id="live-inv-btn" onclick="updateLiveInventory()">🌐 最新台数を自動取得</button>
+          <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px">
+            <input type="checkbox" id="live-inv-startup" onchange="lsSave('shsac6_live_startup',this.checked)">起動時にも自動取得
+          </label>
+          <div style="font-size:12px;color:var(--text3);margin-top:8px;line-height:1.7">高松の貸出可能台数を取り込みます（駐輪総数とは異なります）。更新すると、作成済みの提案・ルート・進捗はクリアされます。駐輪総数を使う場合は下のCSVで更新してください。</div>
+          <div id="live-inv-status" role="status" aria-live="polite" style="font-size:12px;margin-top:8px;line-height:1.7"></div>
+          <div style="font-size:10px;color:var(--text3);margin-top:8px;line-height:1.6">データ提供：株式会社ドコモ・バイクシェア／公共交通オープンデータ協議会<br>
+            <a href="https://ckan.odpt.org/dataset/c_bikeshare_gbfs-d-nationwide-bikeshare" target="_blank" rel="noopener">公開データ</a>（<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>）を高松のポートに照合して表示。
+          </div>
+        </div>
         <div style="font-size:13px;color:var(--text3);font-weight:500;margin-bottom:6px">①管理画面のCSVを貼り付け（新フォーマットのカンマ区切り／旧タブ区切り どちらもOK・見出し行ありOK）</div>
         <textarea id="paste-input" placeholder="ポート名,集配区画名,駐輪台数,…,利用可能,…
 001.ドコモ四国ビル,TKM,3,0,8,5,8,3,…"></textarea>
@@ -2054,6 +2065,132 @@ function resetFieldMode(){
 // ════════════════════════════════════════════════
 // §9 INVENTORY & COMMUTE
 // ════════════════════════════════════════════════
+// GBFS 2.3: nationwide port numbers repeat, so require both number and location.
+const LIVE_GBFS_BASE='https://api-public.odpt.org/api/v4/gbfs/docomo-cycle/';
+const LIVE_MAX_AGE=10*60;
+let liveInvBusy=false,inventoryRevision=0;
+function liveDataTime(value){
+  return typeof value==='number' && Number.isFinite(value) ? value : NaN;
+}
+function buildLiveInventory(info,status,ports,now=Date.now()/1000){
+  if(!Array.isArray(info?.data?.stations)||!Array.isArray(status?.data?.stations))
+    throw new Error('公開データの形式を確認できません');
+  const updated=liveDataTime(status.last_updated);
+  if(!Number.isFinite(updated)||now-updated>LIVE_MAX_AGE||updated-now>120)
+    throw new Error('公開データの更新時刻が古いか不正です');
+  const statuses=new Map();
+  for(const s of status.data.stations){
+    const id=String(s.station_id);
+    statuses.set(id,statuses.has(id)?null:s);
+  }
+  const values={},missing=[],unavailable=[];
+  const used=new Set();
+  let oldest=updated;
+  for(const p of ports){
+    const matches=info.data.stations.filter(s=>{
+      const no=String(s.name||'').normalize('NFKC').match(/^(\d{3})[.．\s]/)?.[1];
+      return no===p.no && Number.isFinite(s.lat)&&Number.isFinite(s.lon)
+        && gd(p,{lat:s.lat,lng:s.lon})<300;
+    });
+    const station=matches.length===1?matches[0]:null;
+    const id=station?String(station.station_id):'';
+    const s=station && !used.has(id)?statuses.get(id):null;
+    const reported=liveDataTime(s?.last_reported);
+    if(!s||!Number.isInteger(s.num_bikes_available)||s.num_bikes_available<0
+      ||!Number.isFinite(reported)||now-reported>LIVE_MAX_AGE||reported-now>120
+      ||![true,false,0,1].includes(s.is_installed)||![true,false,0,1].includes(s.is_renting)){
+      missing.push(p.no);continue;
+    }
+    used.add(id);
+    oldest=Math.min(oldest,reported);
+    const rentable=!!s.is_installed&&!!s.is_renting;
+    values[p.no]=rentable?s.num_bikes_available:0;
+    if(!rentable)unavailable.push(p.no);
+  }
+  // Do not mix old/unknown counts into a supposedly current plan.
+  if(missing.length)throw new Error(`照合・鮮度を確認できないポート：${missing.join('、')}`);
+  if(!Object.keys(values).length)throw new Error('対象ポートがありません');
+  return {values,updated:oldest,unavailable};
+}
+function livePlanSignature(){
+  return JSON.stringify([inventoryRevision,INV,currentMode,[...selVeh],[...selDst],currentOptRoute,
+    flatSteps,stepStatus,autoResult,commuteGo,commuteRet,
+    typeof carFlatSteps==='undefined'?[]:carFlatSteps,
+    typeof carStepStatus==='undefined'?{}:carStepStatus]);
+}
+function liveRouteCalculating(){
+  return ['calc-btn','calc-car-btn'].some(id=>document.getElementById(id)?.disabled);
+}
+function clearInventoryPlans(){
+  selVeh.clear();selDst.clear();resetExtraSlots();
+  currentOptRoute=[];flatSteps=[];stepStatus={};transitSelections={};
+  autoResult=null;fieldActive=false;lastRouteData=null;
+  if(typeof carFlatSteps!=='undefined')carFlatSteps=[];
+  if(typeof carStepStatus!=='undefined')carStepStatus={};
+  if(map){map.remove();map=null;}if(carMap){carMap.remove();carMap=null;}
+  mapRouteLine=null;carRouteLine=null;mapMarkers=[];carMarkers=[];
+  for(const id of ['route-wrap','pairs-wrap','field-steps','field-summary','field-window-bar',
+    'car-route-wrap','car-field-steps','car-field-summary','print-table','car-print-table','map-container','car-map-container']){
+    const el=document.getElementById(id);if(el)el.innerHTML='';
+  }
+  for(const id of ['map-container','car-map-container','map-label-bar','field-progress-bar','field-summary',
+    'field-window-bar','field-recalc-banner','car-field-summary']){
+    const el=document.getElementById(id);if(el)el.style.display='none';
+  }
+  for(const id of ['field-progress','car-progress']){
+    const el=document.getElementById(id);if(el)el.style.width='0%';
+  }
+  initCommute();renderSrc();renderDst();updateBar();
+  renderAutoBanner();renderAutoDataStatus();renderAutoResult();renderCarPairSummary();
+}
+async function updateLiveInventory(){
+  if(liveInvBusy)return;
+  const message=document.getElementById('live-inv-status');
+  if(liveRouteCalculating()){
+    message.textContent='ルート計算が終わってから取得してください。';return;
+  }
+  const signature=livePlanSignature();
+  const button=document.getElementById('live-inv-btn');
+  liveInvBusy=true;button.disabled=true;button.textContent='取得中…';
+  message.textContent='高松の公開データを確認しています…';
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),20000);
+  try{
+    const get=async name=>{
+      const response=await fetch(LIVE_GBFS_BASE+name+'.json',{
+        signal:controller.signal,cache:'no-store',credentials:'omit'});
+      if(!response.ok)throw new Error(`公開データへの接続エラー（${response.status}）`);
+      return response.json();
+    };
+    const [info,status]=await Promise.all([get('station_information'),get('station_status')]);
+    const result=buildLiveInventory(info,status,ALL_PORTS);
+    if(signature!==livePlanSignature()||liveRouteCalculating())
+      throw new Error('取得中に在庫や計画が変更されたため、もう一度取得してください');
+    INV=result.values;inventoryRevision++;lsSave(LS_INV,INV);
+    clearInventoryPlans();
+    const at=new Date(result.updated*1000).toLocaleString('ja-JP');
+    const label=`✓ ${Object.keys(INV).length}ポート更新（貸出可能台数）／データ時刻 ${at}`
+      +(result.unavailable.length?`／貸出停止中は0台：${result.unavailable.join('、')}`:'');
+    lsSave('shsac6_live_meta',label);
+    message.textContent=label;
+    document.getElementById('inv-msg').textContent='公開データを反映しました。';
+    document.getElementById('paste-status').textContent=`公開データ ${at}`;
+  }catch(error){
+    message.textContent=`取得できませんでした。${error.name==='AbortError'?'通信がタイムアウトしました':error.message}。現在の在庫は保持しています。再取得またはCSV入力をお使いください。`;
+  }finally{
+    clearTimeout(timer);controller.abort();liveInvBusy=false;
+    button.disabled=false;button.textContent='🌐 最新台数を自動取得';
+  }
+}
+function initLiveInventory(){
+  document.getElementById('live-inv-btn').disabled=false;
+  document.getElementById('live-inv-btn').textContent='🌐 最新台数を自動取得';
+  const enabled=lsLoad('shsac6_live_startup')===true;
+  document.getElementById('live-inv-startup').checked=enabled;
+  const previous=lsLoad('shsac6_live_meta');
+  document.getElementById('live-inv-status').textContent=previous?`前回取得：${previous}`:'未取得';
+  if(enabled)updateLiveInventory();
+}
 // ── 在庫取込み：新フォーマット（見出し行つきCSV）／旧形式（タブ区切り）を自動判別 ──
 let invCol = 'avail';   // 'avail'=利用可能 / 'parked'=駐輪台数
 function setInvCol(c){
@@ -2123,6 +2260,8 @@ function doUpdateInv(){
   if(!txt){document.getElementById('inv-msg').textContent='テキストを貼り付けてください';return;}
   const p=parseInv(txt),n=Object.keys(p).length;
   if(!n){document.getElementById('inv-msg').textContent='データが見つかりません';return;}
+  inventoryRevision++;lsDel('shsac6_live_meta');
+  document.getElementById('live-inv-status').textContent='CSV入力の在庫を使用中';
   INV={...INV_DEFAULT,...p};selVeh.clear();selDst.clear();
   currentOptRoute=[];flatSteps=[];stepStatus={};transitSelections={};
   lsSave(LS_INV,INV);
@@ -2134,6 +2273,8 @@ function doUpdateInv(){
   document.getElementById('route-wrap').innerHTML='';document.getElementById('pairs-wrap').innerHTML='';
 }
 function resetInv(){
+  inventoryRevision++;lsDel('shsac6_live_meta');
+  document.getElementById('live-inv-status').textContent='未取得';
   INV={...INV_DEFAULT};selVeh.clear();selDst.clear();
   currentOptRoute=[];flatSteps=[];stepStatus={};transitSelections={};
   lsDel(LS_INV);
@@ -3363,6 +3504,7 @@ syncNatFromFlow();
 setAutoPriority(autoLambda);setAutoRankW(autoRankW);setAutoHubW(autoHubW);
 renderAutoBanner();renderAutoDataStatus();renderAutoResult();
 setInvCol(invCol);
+initLiveInventory();
 
 // ════════════════════════════════════════════════
 // §PWA  ホーム画面アプリ化・自動更新
