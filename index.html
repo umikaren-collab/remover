@@ -321,10 +321,10 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
 
 <div class="topbar" id="topbar" style="display: none;">
   <span class="topbar-title">🚲 効率化８</span>
-  <span class="chip chip-sel" id="t-src">移動元 6台</span>
-  <span class="chip chip-sel" id="t-dst">移動先 6台</span>
-  <span class="chip chip-sel" id="t-pair">ペア 6組</span>
-  <span class="chip chip-warn" id="t-time">推定 190分</span>
+  <span class="chip chip-gray" id="t-src">移動元 0台</span>
+  <span class="chip chip-gray" id="t-dst">移動先 0台</span>
+  <span class="chip chip-gray" id="t-pair">ペア 0組</span>
+  <span class="chip chip-gray" id="t-time">推定 0分</span>
   <div class="ml"><button class="btn btn-p" id="calc-btn" onclick="doRoute()" style="padding:8px 16px;min-height:40px;font-size:14px">ルート計算 ↗</button><button class="btn" onclick="doPrint('plan')" style="padding:8px 14px;min-height:40px;font-size:14px;margin-left:6px">🖨 印刷</button></div>
 </div>
 
@@ -345,7 +345,7 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
             <input type="checkbox" id="live-inv-startup" onchange="lsSave('shsac6_live_startup',this.checked)">起動時にも自動取得
           </label>
           <div style="font-size:12px;color:var(--text3);margin-top:8px;line-height:1.7">高松の貸出可能台数を取り込みます（駐輪総数とは異なります）。更新すると、作成済みの提案・ルート・進捗はクリアされます。駐輪総数を使う場合は下のCSVで更新してください。</div>
-          <div id="live-inv-status" role="status" aria-live="polite" style="font-size:12px;margin-top:8px;line-height:1.7"></div>
+          <div id="live-inv-status" role="status" aria-live="polite" style="font-size:12px;margin-top:8px;line-height:1.7">未取得</div>
           <div style="font-size:10px;color:var(--text3);margin-top:8px;line-height:1.6">データ提供：株式会社ドコモ・バイクシェア／公共交通オープンデータ協議会<br>
             <a href="https://ckan.odpt.org/dataset/c_bikeshare_gbfs-d-nationwide-bikeshare" target="_blank" rel="noopener">公開データ</a>（<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>）を高松のポートに照合して表示。
           </div>
@@ -401,13 +401,13 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
   <div class="sp-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
     <div class="card" style="margin-bottom:0">
       <div style="padding:9px 12px;border-bottom:1px solid var(--border-l);font-size:13px;font-weight:700;color:var(--text2);letter-spacing:.04em;display:flex;align-items:center;justify-content:space-between;border-left:3px solid var(--blue)">
-        移動元<span id="sc" style="font-size:12px;color:var(--text3);font-weight:600">6台</span>
+        移動元<span id="sc" style="font-size:12px;color:var(--text3);font-weight:600">0台</span>
       </div>
       <div id="src-list"></div>
     </div>
     <div class="card" style="margin-bottom:0">
       <div style="padding:9px 12px;border-bottom:1px solid var(--border-l);font-size:13px;font-weight:700;color:var(--text2);letter-spacing:.04em;display:flex;align-items:center;justify-content:space-between;border-left:3px solid var(--red)">
-        移動先<span id="dc" style="font-size:12px;color:var(--text3);font-weight:600">6台</span>
+        移動先<span id="dc" style="font-size:12px;color:var(--text3);font-weight:600">0台</span>
       </div>
       <div id="dst-list"></div>
     </div>
@@ -418,7 +418,7 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
   <div class="card">
     <div class="card-head" style="background:#eafaf1;cursor:default">
       <span class="card-title" style="color:#1e8449">🏠 ハブ在庫状況</span>
-      <span style="font-size:11px;color:#1e8449;margin-left:auto" id="hub-summary-txt">5/10拠点 充足</span>
+      <span style="font-size:11px;color:#1e8449;margin-left:auto" id="hub-summary-txt">0/10拠点 充足</span>
     </div>
     <div id="hub-status-body" style="padding:8px 14px 10px;display:flex;flex-wrap:wrap;gap:6px"></div>
   </div>
@@ -518,16 +518,16 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
 
       <div style="font-size:13px;font-weight:600;color:var(--text3);margin:14px 0 6px">優先度</div>
       <div style="display:flex;gap:0;border-radius:var(--r8);overflow:hidden;border:2px solid var(--purple)">
-        <button id="ap-rev"  onclick="setAutoPriority(0.1)" style="flex:1;min-height:44px;font-size:13px;font-weight:700;border:none;cursor:pointer;font-family:inherit;background:#fff;color:var(--purple)">収益重視</button>
-        <button id="ap-bal"  onclick="setAutoPriority(0.3)" style="flex:1;min-height:44px;font-size:13px;font-weight:700;border:none;cursor:pointer;font-family:inherit;background:var(--purple);color:#fff">バランス</button>
+        <button id="ap-rev" onclick="setAutoPriority(0.1)" style="flex:1;min-height:44px;font-size:13px;font-weight:700;border:none;cursor:pointer;font-family:inherit;background:#fff;color:var(--purple)">収益重視</button>
+        <button id="ap-bal" onclick="setAutoPriority(0.3)" style="flex:1;min-height:44px;font-size:13px;font-weight:700;border:none;cursor:pointer;font-family:inherit;background:var(--purple);color:#fff">バランス</button>
         <button id="ap-near" onclick="setAutoPriority(0.8)" style="flex:1;min-height:44px;font-size:13px;font-weight:700;border:none;cursor:pointer;font-family:inherit;background:#fff;color:var(--purple)">近さ重視</button>
       </div>
       <div style="font-size:11px;color:var(--text4);margin-top:5px;line-height:1.6">遠くても可能性の高い場所へ運ぶか、近場で確実に済ませるかの度合いです。</div>
 
       <div style="font-size:13px;font-weight:600;color:var(--text3);margin:14px 0 6px">ランクの効き具合</div>
       <div style="display:flex;gap:0;border-radius:var(--r8);overflow:hidden;border:2px solid var(--teal)">
-        <button id="ar-weak"   onclick="setAutoRankW(0.2)" style="flex:1;min-height:44px;font-size:13px;font-weight:700;border:none;cursor:pointer;font-family:inherit;background:#fff;color:var(--teal)">弱</button>
-        <button id="ar-mid"    onclick="setAutoRankW(0.4)" style="flex:1;min-height:44px;font-size:13px;font-weight:700;border:none;cursor:pointer;font-family:inherit;background:var(--teal);color:#fff">中</button>
+        <button id="ar-weak" onclick="setAutoRankW(0.2)" style="flex:1;min-height:44px;font-size:13px;font-weight:700;border:none;cursor:pointer;font-family:inherit;background:#fff;color:var(--teal)">弱</button>
+        <button id="ar-mid" onclick="setAutoRankW(0.4)" style="flex:1;min-height:44px;font-size:13px;font-weight:700;border:none;cursor:pointer;font-family:inherit;background:var(--teal);color:#fff">中</button>
         <button id="ar-strong" onclick="setAutoRankW(0.8)" style="flex:1;min-height:44px;font-size:13px;font-weight:700;border:none;cursor:pointer;font-family:inherit;background:#fff;color:var(--teal)">強</button>
       </div>
       <div style="font-size:11px;color:var(--text4);margin-top:5px;line-height:1.6">判断の主軸は自然減率です。ランクは同じくらいの自然減率だったときの後押しに使います。</div>
@@ -544,13 +544,15 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
 
       <div style="font-size:13px;font-weight:600;color:var(--text3);margin:14px 0 6px">HUB拠点の優先度</div>
       <div style="display:flex;gap:0;border-radius:var(--r8);overflow:hidden;border:2px solid var(--green)">
-        <button id="ah-weak"   onclick="setAutoHubW(0.25)" style="flex:1;min-height:44px;font-size:13px;font-weight:700;border:none;cursor:pointer;font-family:inherit;background:#fff;color:var(--green)">弱</button>
-        <button id="ah-mid"    onclick="setAutoHubW(0.5)"  style="flex:1;min-height:44px;font-size:13px;font-weight:700;border:none;cursor:pointer;font-family:inherit;background:var(--green);color:#fff">中</button>
-        <button id="ah-strong" onclick="setAutoHubW(1.0)"  style="flex:1;min-height:44px;font-size:13px;font-weight:700;border:none;cursor:pointer;font-family:inherit;background:#fff;color:var(--green)">強</button>
+        <button id="ah-weak" onclick="setAutoHubW(0.25)" style="flex:1;min-height:44px;font-size:13px;font-weight:700;border:none;cursor:pointer;font-family:inherit;background:#fff;color:var(--green)">弱</button>
+        <button id="ah-mid" onclick="setAutoHubW(0.5)" style="flex:1;min-height:44px;font-size:13px;font-weight:700;border:none;cursor:pointer;font-family:inherit;background:var(--green);color:#fff">中</button>
+        <button id="ah-strong" onclick="setAutoHubW(1.0)" style="flex:1;min-height:44px;font-size:13px;font-weight:700;border:none;cursor:pointer;font-family:inherit;background:#fff;color:var(--green)">強</button>
       </div>
-      <div style="font-size:11px;color:var(--text4);margin-top:5px;line-height:1.6">HUB指定のポートは優先して補充し、そこからは抜きにくくします。<span id="auto-hub-count"></span></div>
+      <div style="font-size:11px;color:var(--text4);margin-top:5px;line-height:1.6">HUB指定のポートは優先して補充し、そこからは抜きにくくします。<span id="auto-hub-count">現在 10ポートがHUB指定です。</span></div>
 
-      <div id="auto-data-status" style="margin:12px 0 10px"></div>
+      <div id="auto-data-status" style="margin:12px 0 10px"><div style="font-size:11px;color:var(--teal);background:var(--teal-l);border:1px solid var(--teal-b);padding:7px 9px;border-radius:var(--r8);line-height:1.6">
+      ✓ 2027年7月の実績を全 44 ポートに反映済み（貸出・返却は回/日）。借りられるか／返せるかを両面で判断します。
+      <br>行き先の構成比（46ポート分）も使い、<strong>返却先が満車になりそうな置き方は価値を下げます</strong>。</div></div>
       <button class="btn" id="calc-auto-btn" onclick="doAutoPlan()" style="width:100%;font-size:15px;background:var(--purple);color:#fff;border-color:var(--purple)">⚡ 自動で移動内容を組む</button>
     </div>
   </div>
@@ -723,53 +725,53 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
 // §1 DATA LAYER
 // ════════════════════════════════════════════════
 const ALL_PORTS=[
-  {no:"001",name:"ドコモ四国ビル",rank:"A",lower:3,target:4,upper:6,nat:0.25,out:1.452,back:0.871,lat:34.338448,lng:134.04706,capacity:8,hub:true},
-  {no:"003",name:"高松シンボルタワー",rank:"S",lower:3,target:4,upper:6,nat:-0.09,out:2.935,back:3.516,lat:34.352301,lng:134.047461,capacity:10,hub:true},
-  {no:"004",name:"No.1の街にする会",rank:"D",lower:0,target:0,upper:1,nat:0.6,out:0.129,back:0.032,lat:34.338008,lng:134.042984,capacity:5},
-  {no:"005",name:"テック鍛冶屋町第1",rank:"A",lower:0,target:2,upper:3,nat:-0.163,out:1.161,back:1.613,lat:34.342504,lng:134.049109,capacity:5},
-  {no:"006",name:"セトラスビル",rank:"A",lower:2,target:4,upper:5,nat:-0.119,out:1.903,back:2.419,lat:34.345146,lng:134.048101,capacity:10,hub:true},
-  {no:"007",name:"香川証券駐車場",rank:"B",lower:3,target:4,upper:6,nat:0.51,out:1.194,back:0.387,lat:34.341122,lng:134.038184,capacity:6,hub:true},
-  {no:"008",name:"シーバイボニーズ",rank:"D",lower:0,target:0,upper:1,nat:-0.714,out:0.032,back:0.194,lat:34.335714,lng:134.043686,capacity:4},
-  {no:"009",name:"あいびー高松",rank:"C",lower:0,target:1,upper:2,nat:-0.143,out:0.194,back:0.258,lat:34.329114,lng:134.051571,capacity:3},
-  {no:"010",name:"ザ・チェルシーブレス",rank:"D",lower:0,target:0,upper:1,nat:0.333,out:0.065,back:0.032,lat:34.253462,lng:134.028207,capacity:4,exclude:true},
-  {no:"011",name:"テック錦町1-3",rank:"B",lower:1,target:2,upper:4,nat:0.208,out:0.935,back:0.613,lat:34.348544,lng:134.045798,capacity:4},
-  {no:"012",name:"テック瓦町2-1",rank:"B",lower:0,target:1,upper:2,nat:-0.045,out:0.677,back:0.742,lat:34.340446,lng:134.050001,capacity:2},
-  {no:"013",name:"テック浜ノ町第1",rank:"C",lower:0,target:1,upper:3,nat:-0.091,out:0.323,back:0.387,lat:34.350954,lng:134.037954,capacity:4},
-  {no:"014",name:"テック西の丸町第1",rank:"B",lower:0,target:1,upper:3,nat:0.062,out:0.548,back:0.484,lat:34.348844,lng:134.04767,capacity:4},
-  {no:"015",name:"テック中央町第1",rank:"A",lower:1,target:2,upper:4,nat:0.129,out:1.129,back:0.871,lat:34.335151,lng:134.046505,capacity:6},
-  {no:"016",name:"テックパーキング亀岡町第１",rank:"D",lower:0,target:0,upper:1,nat:0,out:0.032,back:0.032,lat:34.336199,lng:134.042617,capacity:10,carBase:true},
-  {no:"017",name:"エコ錦町2-1",rank:"C",lower:1,target:1,upper:3,nat:0.176,out:0.323,back:0.226,lat:34.34759,lng:134.042455,capacity:4},
-  {no:"018",name:"テック瓦町1-3",rank:"A",lower:1,target:3,upper:4,nat:-0.26,out:0.871,back:1.484,lat:34.341714,lng:134.052485,capacity:8,hub:true},
-  {no:"019",name:"エコ番町2-1",rank:"C",lower:0,target:1,upper:2,nat:-0.143,out:0.194,back:0.258,lat:34.344223,lng:134.040169,capacity:2},
-  {no:"020",name:"香西工務店",rank:"B",lower:0,target:1,upper:2,nat:-0.22,out:0.742,back:1.161,lat:34.32647,lng:134.043628,capacity:8},
-  {no:"021",name:"KANEMITSU",rank:"B",lower:1,target:1,upper:3,nat:0.12,out:0.452,back:0.355,lat:34.333805,lng:134.042883,capacity:5},
-  {no:"022",name:"セーラー広告",rank:"B",lower:0,target:1,upper:3,nat:0,out:0.516,back:0.516,lat:34.344199,lng:134.036871,capacity:3},
-  {no:"023",name:"テック錦町1-1",rank:"D",lower:0,target:0,upper:1,nat:1,out:0.065,back:0.0,lat:34.345403,lng:134.045375,capacity:2},
-  {no:"024",name:"セントラルスカイ",rank:"B",lower:1,target:2,upper:4,nat:0.63,out:0.71,back:0.161,lat:34.337506,lng:134.046702,capacity:5},
-  {no:"025",name:"GRANLAB 丸の内",rank:"B",lower:0,target:1,upper:3,nat:0,out:0.71,back:0.71,lat:34.346745,lng:134.053834,capacity:6},
-  {no:"026",name:"NTT西 スロープ下",rank:"C",lower:0,target:1,upper:2,nat:-0.368,out:0.194,back:0.419,lat:34.336323,lng:134.051556,capacity:3,hub:true},
-  {no:"027",name:"NTT西 公衆電話横",rank:"D",lower:0,target:1,upper:3,nat:0,out:0.032,back:0.032,lat:34.336306,lng:134.051714,capacity:6,hub:true},
-  {no:"028",name:"NTT西 ビル横",rank:"C",lower:0,target:1,upper:3,nat:0,out:0.258,back:0.258,lat:34.336228,lng:134.051366,capacity:3,hub:true},
-  {no:"029",name:"エコ城東町1-1",rank:"A",lower:3,target:4,upper:6,nat:0.059,out:1.161,back:1.032,lat:34.34709,lng:134.057526,capacity:6,hub:true},
-  {no:"030",name:"テック今新町第1",rank:"C",lower:0,target:1,upper:2,nat:-0.167,out:0.161,back:0.226,lat:34.343744,lng:134.054714,capacity:4},
-  {no:"031",name:"愛宕神社",rank:"C",lower:0,target:1,upper:3,nat:0,out:0.129,back:0.129,lat:34.347743,lng:134.037641,capacity:3},
-  {no:"032",name:"青鬼くん前",rank:"S",lower:1,target:2,upper:4,nat:0.006,out:2.548,back:2.516,lat:34.350253,lng:134.047477,capacity:5},
-  {no:"033",name:"高速バスタ前",rank:"S",lower:2,target:3,upper:5,nat:-0.003,out:5.065,back:5.097,lat:34.350269,lng:134.047132,capacity:5},
-  {no:"034",name:"第一生命ビル",rank:"C",lower:0,target:1,upper:2,nat:-0.167,out:0.161,back:0.226,lat:34.348288,lng:134.047518,capacity:4},
-  {no:"035",name:"日本生命高松駅前",rank:"B",lower:0,target:1,upper:3,nat:-0.097,out:0.452,back:0.548,lat:34.350428,lng:134.048418,capacity:5},
-  {no:"036",name:"明治安田生命高松",rank:"B",lower:0,target:1,upper:2,nat:-0.235,out:0.419,back:0.677,lat:34.342607,lng:134.047756,capacity:8},
-  {no:"037",name:"石清尾八幡宮（いわせお）",rank:"B",lower:0,target:1,upper:3,nat:0,out:0.774,back:0.774,lat:34.336952,lng:134.035945,capacity:5},
-  {no:"038",name:"アパホテル高松瓦町",rank:"B",lower:0,target:1,upper:2,nat:0.077,out:0.452,back:0.387,lat:34.340417,lng:134.053466,capacity:2},
-  {no:"039",name:"らく楽花園",rank:"B",lower:0,target:1,upper:2,nat:-0.111,out:0.774,back:0.968,lat:34.335698,lng:134.055157,capacity:8},
-  {no:"040",name:"百十四銀行本店",rank:"A",lower:3,target:4,upper:6,nat:0,out:1.097,back:1.097,lat:34.34086,lng:134.047931,capacity:11,hub:true},
-  {no:"041",name:"テック八本松第1",rank:"B",lower:1,target:2,upper:4,nat:0.385,out:0.581,back:0.258,lat:34.337967,lng:134.043336,capacity:5},
-  {no:"042",name:"GRANLAB(駐車場)",rank:"D",lower:0,target:0,upper:1,nat:-1,out:0.0,back:0.065,lat:34.346697,lng:134.054374,capacity:8},
-  {no:"043",name:"ファロス第一ビル",rank:"B",lower:1,target:2,upper:4,nat:0.36,out:0.548,back:0.258,lat:34.343903,lng:134.039239,capacity:5},
-  {no:"044",name:"エコ北浜町第1",rank:"C",lower:0,target:1,upper:3,nat:-0.048,out:0.323,back:0.355,lat:34.350043,lng:134.055401,capacity:6},
-  {no:"045",name:"三菱UFJ銀行",rank:"B",lower:0,target:1,upper:2,nat:-0.256,out:0.516,back:0.871,lat:34.34362,lng:134.048268,capacity:4},
-  {no:"046",name:"グローバルセンター",rank:"C",lower:0,target:1,upper:2,nat:-0.111,out:0.129,back:0.161,lat:34.32027,lng:134.041416,capacity:10},
-  {no:"047",name:"セントラル田町ビル No.1",rank:"B",lower:1,target:1,upper:2,nat:0.267,out:0.613,back:0.355,lat:34.33724,lng:134.048873,capacity:2},
-  {no:"048",name:"セントラル田町ビル No.2",rank:"C",lower:1,target:2,upper:3,nat:0.579,out:0.484,back:0.129,lat:34.337045,lng:134.049171,capacity:3}
+  {no:"001",name:"ドコモ四国ビル",rank:"A",lower:3,target:4,upper:6,nat:0.25,lat:34.338448,lng:134.04706,out:1.452,back:0.871,capacity:8,hub:true},
+  {no:"003",name:"高松シンボルタワー",rank:"S",lower:3,target:4,upper:6,nat:-0.09,lat:34.352301,lng:134.047461,out:2.935,back:3.516,capacity:10,hub:true},
+  {no:"004",name:"No.1の街にする会",rank:"D",lower:0,target:0,upper:1,nat:0.602,lat:34.338008,lng:134.042984,out:0.129,back:0.032,capacity:5},
+  {no:"005",name:"テック鍛冶屋町第1",rank:"A",lower:0,target:2,upper:3,nat:-0.163,lat:34.342504,lng:134.049109,out:1.161,back:1.613,capacity:5},
+  {no:"006",name:"セトラスビル",rank:"A",lower:2,target:4,upper:5,nat:-0.119,lat:34.345146,lng:134.048101,out:1.903,back:2.419,capacity:10,hub:true},
+  {no:"007",name:"香川証券駐車場",rank:"B",lower:3,target:4,upper:6,nat:0.51,lat:34.341122,lng:134.038184,out:1.194,back:0.387,capacity:6,hub:true},
+  {no:"008",name:"シーバイボニーズ",rank:"D",lower:0,target:0,upper:1,nat:-0.717,lat:34.335714,lng:134.043686,out:0.032,back:0.194,capacity:4},
+  {no:"009",name:"あいびー高松",rank:"C",lower:0,target:1,upper:2,nat:-0.142,lat:34.329114,lng:134.051571,out:0.194,back:0.258,capacity:3},
+  {no:"010",name:"ザ・チェルシーブレス",rank:"D",lower:0,target:0,upper:1,nat:0.34,lat:34.253462,lng:134.028207,out:0.065,back:0.032,capacity:4,exclude:true},
+  {no:"011",name:"テック錦町1-3",rank:"B",lower:1,target:2,upper:4,nat:0.208,lat:34.348544,lng:134.045798,out:0.935,back:0.613,capacity:4},
+  {no:"012",name:"テック瓦町2-1",rank:"B",lower:0,target:1,upper:2,nat:-0.046,lat:34.340446,lng:134.050001,out:0.677,back:0.742,capacity:2},
+  {no:"013",name:"テック浜ノ町第1",rank:"C",lower:0,target:1,upper:3,nat:-0.09,lat:34.350954,lng:134.037954,out:0.323,back:0.387,capacity:4},
+  {no:"014",name:"テック西の丸町第1",rank:"B",lower:0,target:1,upper:3,nat:0.062,lat:34.348844,lng:134.04767,out:0.548,back:0.484,capacity:4},
+  {no:"015",name:"テック中央町第1",rank:"A",lower:1,target:2,upper:4,nat:0.129,lat:34.335151,lng:134.046505,out:1.129,back:0.871,capacity:6},
+  {no:"016",name:"テックパーキング亀岡町第１",rank:"D",lower:0,target:0,upper:1,nat:0,lat:34.336199,lng:134.042617,out:0.032,back:0.032,capacity:10,carBase:true},
+  {no:"017",name:"エコ錦町2-1",rank:"C",lower:1,target:1,upper:3,nat:0.177,lat:34.34759,lng:134.042455,out:0.323,back:0.226,capacity:4},
+  {no:"018",name:"テック瓦町1-3",rank:"A",lower:1,target:3,upper:4,nat:-0.26,lat:34.341714,lng:134.052485,out:0.871,back:1.484,capacity:8,hub:true},
+  {no:"019",name:"エコ番町2-1",rank:"C",lower:0,target:1,upper:2,nat:-0.142,lat:34.344223,lng:134.040169,out:0.194,back:0.258,capacity:2},
+  {no:"020",name:"香西工務店",rank:"B",lower:0,target:1,upper:2,nat:-0.22,lat:34.32647,lng:134.043628,out:0.742,back:1.161,capacity:8},
+  {no:"021",name:"KANEMITSU",rank:"B",lower:1,target:1,upper:3,nat:0.12,lat:34.333805,lng:134.042883,out:0.452,back:0.355,capacity:5},
+  {no:"022",name:"セーラー広告",rank:"B",lower:0,target:1,upper:3,nat:0,lat:34.344199,lng:134.036871,out:0.516,back:0.516,capacity:3},
+  {no:"023",name:"テック錦町1-1",rank:"D",lower:0,target:0,upper:1,nat:1,lat:34.345403,lng:134.045375,out:0.065,back:0,capacity:2},
+  {no:"024",name:"セントラルスカイ",rank:"B",lower:1,target:2,upper:4,nat:0.63,lat:34.337506,lng:134.046702,out:0.71,back:0.161,capacity:5},
+  {no:"025",name:"GRANLAB 丸の内",rank:"B",lower:0,target:1,upper:3,nat:0,lat:34.346745,lng:134.053834,out:0.71,back:0.71,capacity:6},
+  {no:"026",name:"NTT西 スロープ下",rank:"C",lower:0,target:1,upper:2,nat:-0.367,lat:34.336323,lng:134.051556,out:0.194,back:0.419,capacity:3,hub:true},
+  {no:"027",name:"NTT西 公衆電話横",rank:"D",lower:0,target:1,upper:3,nat:0,lat:34.336306,lng:134.051714,out:0.032,back:0.032,capacity:6,hub:true},
+  {no:"028",name:"NTT西 ビル横",rank:"C",lower:0,target:1,upper:3,nat:0,lat:34.336228,lng:134.051366,out:0.258,back:0.258,capacity:3,hub:true},
+  {no:"029",name:"エコ城東町1-1",rank:"A",lower:3,target:4,upper:6,nat:0.059,lat:34.34709,lng:134.057526,out:1.161,back:1.032,capacity:6,hub:true},
+  {no:"030",name:"テック今新町第1",rank:"C",lower:0,target:1,upper:2,nat:-0.168,lat:34.343744,lng:134.054714,out:0.161,back:0.226,capacity:4},
+  {no:"031",name:"愛宕神社",rank:"C",lower:0,target:1,upper:3,nat:0,lat:34.347743,lng:134.037641,out:0.129,back:0.129,capacity:3},
+  {no:"032",name:"青鬼くん前",rank:"S",lower:1,target:2,upper:4,nat:0.006,lat:34.350253,lng:134.047477,out:2.548,back:2.516,capacity:5},
+  {no:"033",name:"高速バスタ前",rank:"S",lower:2,target:3,upper:5,nat:-0.003,lat:34.350269,lng:134.047132,out:5.065,back:5.097,capacity:5},
+  {no:"034",name:"第一生命ビル",rank:"C",lower:0,target:1,upper:2,nat:-0.168,lat:34.348288,lng:134.047518,out:0.161,back:0.226,capacity:4},
+  {no:"035",name:"日本生命高松駅前",rank:"B",lower:0,target:1,upper:3,nat:-0.096,lat:34.350428,lng:134.048418,out:0.452,back:0.548,capacity:5},
+  {no:"036",name:"明治安田生命高松",rank:"B",lower:0,target:1,upper:2,nat:-0.235,lat:34.342607,lng:134.047756,out:0.419,back:0.677,capacity:8},
+  {no:"037",name:"石清尾八幡宮（いわせお）",rank:"B",lower:0,target:1,upper:3,nat:0,lat:34.336952,lng:134.035945,out:0.774,back:0.774,capacity:5},
+  {no:"038",name:"アパホテル高松瓦町",rank:"B",lower:0,target:1,upper:2,nat:0.077,lat:34.340417,lng:134.053466,out:0.452,back:0.387,capacity:2},
+  {no:"039",name:"らく楽花園",rank:"B",lower:0,target:1,upper:2,nat:-0.111,lat:34.335698,lng:134.055157,out:0.774,back:0.968,capacity:8},
+  {no:"040",name:"百十四銀行本店",rank:"A",lower:3,target:4,upper:6,nat:0,lat:34.34086,lng:134.047931,out:1.097,back:1.097,capacity:11,hub:true},
+  {no:"041",name:"テック八本松第1",rank:"B",lower:1,target:2,upper:4,nat:0.385,lat:34.337967,lng:134.043336,out:0.581,back:0.258,capacity:5},
+  {no:"042",name:"GRANLAB(駐車場)",rank:"D",lower:0,target:0,upper:1,nat:-1,lat:34.346697,lng:134.054374,out:0,back:0.065,capacity:8},
+  {no:"043",name:"ファロス第一ビル",rank:"B",lower:1,target:2,upper:4,nat:0.36,lat:34.343903,lng:134.039239,out:0.548,back:0.258,capacity:5},
+  {no:"044",name:"エコ北浜町第1",rank:"C",lower:0,target:1,upper:3,nat:-0.047,lat:34.350043,lng:134.055401,out:0.323,back:0.355,capacity:6},
+  {no:"045",name:"三菱UFJ銀行",rank:"B",lower:0,target:1,upper:2,nat:-0.256,lat:34.34362,lng:134.048268,out:0.516,back:0.871,capacity:4},
+  {no:"046",name:"グローバルセンター",rank:"C",lower:0,target:1,upper:2,nat:-0.11,lat:34.32027,lng:134.041416,out:0.129,back:0.161,capacity:10},
+  {no:"047",name:"セントラル田町ビル No.1",rank:"B",lower:1,target:1,upper:2,nat:0.267,lat:34.33724,lng:134.048873,out:0.613,back:0.355,capacity:2},
+  {no:"048",name:"セントラル田町ビル No.2",rank:"C",lower:1,target:2,upper:3,nat:0.579,lat:34.337045,lng:134.049171,out:0.484,back:0.129,capacity:3}
 ];
 const PM={};ALL_PORTS.forEach(p=>PM[p.no]=p);
 const START=PM["046"];
@@ -829,7 +831,7 @@ const OD_MONTH='2027年7月';
 
 
 const LS_INV='shsac6_inv',LS_PARAMS='shsac6_params',LS_PORTS='shsac6_ports',LS_COMMUTE='shsac6_commute',LS_VER='shsac6_ver';
-const EMBED_VER=1787223358524;
+const EMBED_VER=1790757743354;
 function lsSave(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){console.warn('LS save failed',e);}}
 function lsLoad(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}}
 function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
@@ -1168,6 +1170,21 @@ function addBaseLayer(targetMap) {
   return layers[idx];
 }
 
+// マーカー色：移動元／移動先／両方／その他（本社・046・経由など）
+const MAP_ROLE_COLOR = { src:'#1565c0', dst:'#f57c00', both:'#00838f', other:'#616161', start:'#1e8449', end:'#c62828' };
+function addRoleLegend(targetMap) {
+  const lg = L.control({ position: 'bottomleft' });
+  lg.onAdd = function() {
+    const d = L.DomUtil.create('div');
+    const dot = c => `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${c};border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25);vertical-align:-2px;margin-right:4px"></span>`;
+    const tag = (c,t) => `<span style="background:${c};color:#fff;border-radius:8px;padding:0 4px;font-size:11px;font-weight:700;margin-right:4px">${t}</span>`;
+    d.style.cssText = 'background:rgba(255,255,255,.92);color:#222;padding:6px 10px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.3);font-size:12px;line-height:1.9;font-weight:600';
+    d.innerHTML = `${dot(MAP_ROLE_COLOR.src)}移動元　${dot(MAP_ROLE_COLOR.dst)}移動先　${dot(MAP_ROLE_COLOR.other)}その他<br>${dot(MAP_ROLE_COLOR.start)}起点　${dot(MAP_ROLE_COLOR.end)}終点`;
+    return d;
+  };
+  lg.addTo(targetMap);
+}
+
 // 地図描画関数 (Leaflet)
 function initOrUpdateMap(mapId, points, osrmRoute) {
   let targetMap = mapId === 'map-container' ? map : carMap;
@@ -1181,6 +1198,7 @@ function initOrUpdateMap(mapId, points, osrmRoute) {
     container.innerHTML = ''; // 保存ページに焼き付いた古い地図DOMを除去
     targetMap = L.map(mapId).setView([34.340, 134.045], 14); // 高松周辺
     addBaseLayer(targetMap);
+    addRoleLegend(targetMap);
     if(mapId === 'map-container') map = targetMap;
     else carMap = targetMap;
   }
@@ -1208,13 +1226,23 @@ function initOrUpdateMap(mapId, points, osrmRoute) {
     if (!_groups[key]) _groups[key] = { lat: p.lat, lng: p.lng, no: p.no, name: p.name || p.no, idxs: [] };
     _groups[key].idxs.push(i);
   });
+  // 移動元／移動先の判定（計画タブの選択内容から）
+  const _srcNos = new Set(), _dstNos = new Set();
+  selVeh.forEach(v => _srcNos.add(String(v).split('-')[0]));
+  selDst.forEach(v => _dstNos.add(String(v).split('-')[0]));
   Object.values(_groups).forEach(g => {
     const isStart = g.idxs.includes(0);
     const isEnd   = g.idxs.includes(points.length - 1);
-    const color = isStart ? 'green' : (isEnd ? 'red' : 'blue');
+    const isSrc = _srcNos.has(g.no), isDst = _dstNos.has(g.no);
+    const role = (isSrc && isDst) ? 'both' : isSrc ? 'src' : isDst ? 'dst' : 'other';
+    // 起点＝緑・終点＝赤で塗り分け。中の小バッジで移動元／移動先も示す
+    const color = isStart ? MAP_ROLE_COLOR.start : isEnd ? MAP_ROLE_COLOR.end : MAP_ROLE_COLOR[role];
     const numLabel = g.idxs.map(ix => ix + 1).join('・');     // 例) 6・8
-    const w = Math.max(24, 14 + numLabel.length * 8);          // 番号桁数に応じて幅可変
-    const markerHtml = `<div style="background-color:${color};color:#fff;border-radius:13px;min-width:${w}px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">${numLabel}</div>`;
+    const roleTxt = {src:'元', dst:'先', both:'元先'}[role];
+    const tags = ((isStart || isEnd) && roleTxt)
+      ? `<span style="background:#fff;color:${MAP_ROLE_COLOR[role]};border-radius:8px;padding:0 4px;margin-right:4px;font-size:11px">${roleTxt}</span>` : '';
+    const w = Math.max(24, 14 + numLabel.length * 8 + (tags ? 12 + roleTxt.length * 11 : 0)); // 番号桁数に応じて幅可変
+    const markerHtml = `<div style="background-color:${color};color:#fff;border-radius:13px;min-width:${w}px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap;box-sizing:border-box">${tags}${numLabel}</div>`;
     const icon = L.divIcon({ html: markerHtml, className: 'custom-div-icon', iconSize: [w, 26], iconAnchor: [w/2, 13] });
     // ラベル種別（mapLabelMode）：番号のみ / 番号＋名前 / なし
     const m = L.marker([g.lat, g.lng], {icon: icon}).addTo(targetMap);
@@ -3547,4 +3575,5 @@ initLiveInventory();
   }
 })();
 </script>
+
 </body></html>
