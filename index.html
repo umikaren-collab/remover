@@ -207,6 +207,28 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
   display: none;
   z-index: 1; /* modalの裏に隠れるように */
 }
+/* 台数マップ */
+#stock-map{height:560px;width:100%;border-radius:var(--r10);border:1px solid var(--border);margin-bottom:10px;z-index:1}
+.sm-bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px 14px}
+.sm-src{font-size:12px;font-weight:600;color:var(--text3);padding:0 14px 10px;line-height:1.6}
+.sm-pin{display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-weight:800;
+  border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);font-size:14px;position:relative;box-sizing:border-box}
+.sm-pin.chg{outline:3px solid #f1c40f;outline-offset:1px}
+.sm-plan{position:absolute;left:100%;top:-6px;margin-left:-6px;background:#fff;color:#333;border:1px solid #bbb;
+  border-radius:8px;font-size:10px;font-weight:800;padding:0 4px;white-space:nowrap;line-height:15px}
+.sm-pop{font-size:13px;line-height:1.7;min-width:190px}
+.sm-pop b{font-size:14px}
+.sm-adj{display:flex;gap:6px;margin-top:6px}
+.sm-adj button{font-family:inherit;font-size:13px;font-weight:700;padding:4px 10px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer}
+.sm-list{padding:0 14px 12px;font-size:13px}
+.sm-list table{width:100%;border-collapse:collapse}
+.sm-list td,.sm-list th{padding:5px 6px;border-bottom:1px solid var(--border);text-align:left}
+.sm-list th{font-size:12px;color:var(--text3)}
+.fq-wrap{display:inline-flex;align-items:center;gap:4px;margin-left:6px;flex-wrap:wrap}
+.fq-lab{font-size:12px;font-weight:700;color:#bbb}
+.fq-btn{font-family:inherit;font-size:13px;font-weight:700;padding:6px 10px;min-height:40px;border-radius:var(--r8);border:1.5px solid #5dade2;background:#1a5276;color:#fff;cursor:pointer}
+.fq-btn:disabled{opacity:.5;cursor:default}
+
 /* マップ上のポート名ラベル */
 .leaflet-tooltip.port-label{
   font-size:11px;font-weight:700;color:#1a5276;
@@ -316,16 +338,17 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
   <div class="mode-tab" id="tab-plan" onclick="switchMode('plan')">計画</div>
   <div class="mode-tab" id="tab-car" onclick="switchMode('car')">🚗 車</div>
   <div class="mode-tab" id="tab-auto" onclick="switchMode('auto')">⚡ 自動</div>
+  <div class="mode-tab" id="tab-stock" onclick="switchMode('stock')">🗺 台数</div>
   <div class="mode-tab active" id="tab-settings" onclick="switchMode('settings')">⚙️</div>
 </div>
 
 <div class="topbar" id="topbar" style="display: none;">
   <span class="topbar-title">🚲 効率化８</span>
-  <span class="chip chip-sel" id="t-src">移動元 7台</span>
-  <span class="chip chip-sel" id="t-dst">移動先 7台</span>
-  <span class="chip chip-sel" id="t-pair">ペア 7組</span>
-  <span class="chip chip-warn" id="t-time">推定 93分</span>
-  <div class="ml"><button class="btn btn-p" id="calc-btn" onclick="doRoute()" style="padding:8px 16px;min-height:40px;font-size:14px">ルート計算 ↗</button><button class="btn" onclick="doPrint('plan')" style="padding:8px 14px;min-height:40px;font-size:14px;margin-left:6px">🖨 印刷</button></div>
+  <span class="chip chip-gray" id="t-src">移動元 0台</span>
+  <span class="chip chip-gray" id="t-dst">移動先 0台</span>
+  <span class="chip chip-gray" id="t-pair">ペア 0組</span>
+  <span class="chip chip-gray" id="t-time">推定 0分</span>
+  <div class="ml"><button class="btn btn-p" id="calc-btn" onclick="doRoute()" style="padding:8px 16px;min-height:40px;font-size:14px">ルート計算 ↗</button><span class="fq-wrap"><span class="fq-lab">計算して現場へ</span><button class="fq-btn" onclick="doRouteField(3)">3件</button><button class="fq-btn" onclick="doRouteField(5)">5件</button><button class="fq-btn" onclick="doRouteField(8)">8件</button><button class="fq-btn" onclick="doRouteField('all')">全部</button></span><button class="btn" onclick="doPrint('plan')" style="padding:8px 14px;min-height:40px;font-size:14px;margin-left:6px">🖨 印刷</button></div>
 </div>
 
 <div id="mode-plan" style="display: none;">
@@ -345,7 +368,7 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
             <input type="checkbox" id="live-inv-startup" onchange="lsSave('shsac6_live_startup',this.checked)">起動時にも自動取得
           </label>
           <div style="font-size:12px;color:var(--text3);margin-top:8px;line-height:1.7">高松の貸出可能台数を取り込みます（駐輪総数とは異なります）。更新すると、作成済みの提案・ルート・進捗はクリアされます。駐輪総数を使う場合は下のCSVで更新してください。</div>
-          <div id="live-inv-status" role="status" aria-live="polite" style="font-size:12px;margin-top:8px;line-height:1.7">✓ 48ポート更新（貸出可能台数）／データ時刻 2026/10/13 19:24:58</div>
+          <div id="live-inv-status" role="status" aria-live="polite" style="font-size:12px;margin-top:8px;line-height:1.7">未取得</div>
           <div style="font-size:10px;color:var(--text3);margin-top:8px;line-height:1.6">データ提供：株式会社ドコモ・バイクシェア／公共交通オープンデータ協議会<br>
             <a href="https://ckan.odpt.org/dataset/c_bikeshare_gbfs-d-nationwide-bikeshare" target="_blank" rel="noopener">公開データ</a>（<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>）を高松のポートに照合して表示。
           </div>
@@ -368,7 +391,7 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
         <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
           <button class="btn btn-g" onclick="doUpdateInv()">在庫を更新する</button>
           <button class="btn" onclick="resetInv()">初期値に戻す</button>
-          <span style="font-size:11px;color:var(--green);align-self:center" id="inv-msg">公開データを反映しました。</span>
+          <span style="font-size:11px;color:var(--green);align-self:center" id="inv-msg">✓ 47ポート更新（利用可能）</span>
         </div>
       </div>
     </div>
@@ -380,11 +403,11 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
       <div class="sp-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div>
           <div style="font-size:13px;font-weight:600;color:var(--text3);margin-bottom:5px">● 出発（046から持ち込み）</div>
-          <select id="sel-go" onchange="onCommuteChange()"><option value="">持ち込まない</option><option value="001">046→001.ドコモ四国ビル</option><option value="003">046→003.高松シンボルタワー</option><option value="004">046→004.No.1の街にする会</option><option value="005">046→005.テック鍛冶屋町第1</option><option value="006">046→006.セトラスビル</option><option value="007">046→007.香川証券駐車場</option><option value="008">046→008.シーバイボニーズ</option><option value="009">046→009.あいびー高松</option><option value="010">046→010.ザ・チェルシーブレス</option><option value="011">046→011.テック錦町1-3</option><option value="012">046→012.テック瓦町2-1</option><option value="013">046→013.テック浜ノ町第1</option><option value="014">046→014.テック西の丸町第1</option><option value="015">046→015.テック中央町第1</option><option value="016">046→016.テックパーキング亀岡町第１</option><option value="017">046→017.エコ錦町2-1</option><option value="018">046→018.テック瓦町1-3</option><option value="019">046→019.エコ番町2-1</option><option value="020">046→020.香西工務店</option><option value="021">046→021.KANEMITSU</option><option value="022">046→022.セーラー広告</option><option value="023">046→023.テック錦町1-1</option><option value="024">046→024.セントラルスカイ</option><option value="025">046→025.GRANLAB 丸の内</option><option value="026">046→026.NTT西 スロープ下</option><option value="027">046→027.NTT西 公衆電話横</option><option value="028">046→028.NTT西 ビル横</option><option value="029">046→029.エコ城東町1-1</option><option value="030">046→030.テック今新町第1</option><option value="031">046→031.愛宕神社</option><option value="032">046→032.青鬼くん前</option><option value="033">046→033.高速バスタ前</option><option value="034">046→034.第一生命ビル</option><option value="035">046→035.日本生命高松駅前</option><option value="036">046→036.明治安田生命高松</option><option value="037">046→037.石清尾八幡宮（いわせお）</option><option value="038">046→038.アパホテル高松瓦町</option><option value="039">046→039.らく楽花園</option><option value="040">046→040.百十四銀行本店</option><option value="041">046→041.テック八本松第1</option><option value="042">046→042.GRANLAB(駐車場)</option><option value="043">046→043.ファロス第一ビル</option><option value="044">046→044.エコ北浜町第1</option><option value="045">046→045.三菱UFJ銀行</option><option value="047">046→047.セントラル田町ビル No.1</option><option value="048">046→048.セントラル田町ビル No.2</option><option value="049">046→049.高松予備校</option></select>
+          <select id="sel-go" onchange="onCommuteChange()"><option value="">持ち込まない</option><option value="001">046→001.ドコモ四国ビル</option><option value="003">046→003.高松シンボルタワー</option><option value="004">046→004.No.1の街にする会</option><option value="005">046→005.テック鍛冶屋町第1</option><option value="006">046→006.セトラスビル</option><option value="007">046→007.香川証券駐車場</option><option value="008">046→008.シーバイボニーズ</option><option value="009">046→009.あいびー高松</option><option value="010">046→010.ザ・チェルシーブレス</option><option value="011">046→011.テック錦町1-3</option><option value="012">046→012.テック瓦町2-1</option><option value="013">046→013.テック浜ノ町第1</option><option value="014">046→014.テック西の丸町第1</option><option value="015">046→015.テック中央町第1</option><option value="016">046→016.テックパーキング亀岡町第１</option><option value="017">046→017.エコ錦町2-1</option><option value="018">046→018.テック瓦町1-3</option><option value="019">046→019.エコ番町2-1</option><option value="020">046→020.香西工務店</option><option value="021">046→021.KANEMITSU</option><option value="022">046→022.セーラー広告</option><option value="023">046→023.テック錦町1-1</option><option value="024">046→024.セントラルスカイ</option><option value="025">046→025.GRANLAB 丸の内</option><option value="026">046→026.NTT西 スロープ下</option><option value="027">046→027.NTT西 公衆電話横</option><option value="028">046→028.NTT西 ビル横</option><option value="029">046→029.エコ城東町1-1</option><option value="030">046→030.テック今新町第1</option><option value="031">046→031.愛宕神社</option><option value="032">046→032.青鬼くん前</option><option value="033">046→033.高速バスタ前</option><option value="034">046→034.第一生命ビル</option><option value="035">046→035.日本生命高松駅前</option><option value="036">046→036.明治安田生命高松</option><option value="037">046→037.石清尾八幡宮（いわせお）</option><option value="038">046→038.アパホテル高松瓦町</option><option value="039">046→039.らく楽花園</option><option value="040">046→040.百十四銀行本店</option><option value="041">046→041.テック八本松第1</option><option value="042">046→042.GRANLAB(駐車場)</option><option value="043">046→043.ファロス第一ビル</option><option value="044">046→044.エコ北浜町第1</option><option value="045">046→045.三菱UFJ銀行</option><option value="047">046→047.セントラル田町ビル No.1</option><option value="048">046→048.セントラル田町ビル No.2</option></select>
         </div>
         <div>
           <div style="font-size:13px;font-weight:600;color:var(--text3);margin-bottom:5px">○ 帰宅（046へ持ち帰り）</div>
-          <select id="sel-ret" onchange="onCommuteChange()"><option value="">持ち帰らない</option><option value="001">001.ドコモ四国ビル→046</option><option value="003">003.高松シンボルタワー→046</option><option value="004">004.No.1の街にする会→046</option><option value="005">005.テック鍛冶屋町第1→046</option><option value="006">006.セトラスビル→046</option><option value="007">007.香川証券駐車場→046</option><option value="008">008.シーバイボニーズ→046</option><option value="009">009.あいびー高松→046</option><option value="010">010.ザ・チェルシーブレス→046</option><option value="011">011.テック錦町1-3→046</option><option value="012">012.テック瓦町2-1→046</option><option value="013">013.テック浜ノ町第1→046</option><option value="014">014.テック西の丸町第1→046</option><option value="015">015.テック中央町第1→046</option><option value="016">016.テックパーキング亀岡町第１→046</option><option value="017">017.エコ錦町2-1→046</option><option value="018">018.テック瓦町1-3→046</option><option value="019">019.エコ番町2-1→046</option><option value="020">020.香西工務店→046</option><option value="021">021.KANEMITSU→046</option><option value="022">022.セーラー広告→046</option><option value="023">023.テック錦町1-1→046</option><option value="024">024.セントラルスカイ→046</option><option value="025">025.GRANLAB 丸の内→046</option><option value="026">026.NTT西 スロープ下→046</option><option value="027">027.NTT西 公衆電話横→046</option><option value="028">028.NTT西 ビル横→046</option><option value="029">029.エコ城東町1-1→046</option><option value="030">030.テック今新町第1→046</option><option value="031">031.愛宕神社→046</option><option value="032">032.青鬼くん前→046</option><option value="033">033.高速バスタ前→046</option><option value="034">034.第一生命ビル→046</option><option value="035">035.日本生命高松駅前→046</option><option value="036">036.明治安田生命高松→046</option><option value="037">037.石清尾八幡宮（いわせお）→046</option><option value="038">038.アパホテル高松瓦町→046</option><option value="039">039.らく楽花園→046</option><option value="040">040.百十四銀行本店→046</option><option value="041">041.テック八本松第1→046</option><option value="042">042.GRANLAB(駐車場)→046</option><option value="043">043.ファロス第一ビル→046</option><option value="044">044.エコ北浜町第1→046</option><option value="045">045.三菱UFJ銀行→046</option><option value="047">047.セントラル田町ビル No.1→046</option><option value="048">048.セントラル田町ビル No.2→046</option><option value="049">049.高松予備校→046</option></select>
+          <select id="sel-ret" onchange="onCommuteChange()"><option value="">持ち帰らない</option><option value="001">001.ドコモ四国ビル→046</option><option value="003">003.高松シンボルタワー→046</option><option value="004">004.No.1の街にする会→046</option><option value="005">005.テック鍛冶屋町第1→046</option><option value="006">006.セトラスビル→046</option><option value="007">007.香川証券駐車場→046</option><option value="008">008.シーバイボニーズ→046</option><option value="009">009.あいびー高松→046</option><option value="010">010.ザ・チェルシーブレス→046</option><option value="011">011.テック錦町1-3→046</option><option value="012">012.テック瓦町2-1→046</option><option value="013">013.テック浜ノ町第1→046</option><option value="014">014.テック西の丸町第1→046</option><option value="015">015.テック中央町第1→046</option><option value="016">016.テックパーキング亀岡町第１→046</option><option value="017">017.エコ錦町2-1→046</option><option value="018">018.テック瓦町1-3→046</option><option value="019">019.エコ番町2-1→046</option><option value="020">020.香西工務店→046</option><option value="021">021.KANEMITSU→046</option><option value="022">022.セーラー広告→046</option><option value="023">023.テック錦町1-1→046</option><option value="024">024.セントラルスカイ→046</option><option value="025">025.GRANLAB 丸の内→046</option><option value="026">026.NTT西 スロープ下→046</option><option value="027">027.NTT西 公衆電話横→046</option><option value="028">028.NTT西 ビル横→046</option><option value="029">029.エコ城東町1-1→046</option><option value="030">030.テック今新町第1→046</option><option value="031">031.愛宕神社→046</option><option value="032">032.青鬼くん前→046</option><option value="033">033.高速バスタ前→046</option><option value="034">034.第一生命ビル→046</option><option value="035">035.日本生命高松駅前→046</option><option value="036">036.明治安田生命高松→046</option><option value="037">037.石清尾八幡宮（いわせお）→046</option><option value="038">038.アパホテル高松瓦町→046</option><option value="039">039.らく楽花園→046</option><option value="040">040.百十四銀行本店→046</option><option value="041">041.テック八本松第1→046</option><option value="042">042.GRANLAB(駐車場)→046</option><option value="043">043.ファロス第一ビル→046</option><option value="044">044.エコ北浜町第1→046</option><option value="045">045.三菱UFJ銀行→046</option><option value="047">047.セントラル田町ビル No.1→046</option><option value="048">048.セントラル田町ビル No.2→046</option></select>
         </div>
         <div>
           <div style="font-size:13px;font-weight:600;color:var(--text3);margin-bottom:5px">開始時刻</div>
@@ -401,42 +424,42 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
   <div class="sp-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
     <div class="card" style="margin-bottom:0">
       <div style="padding:9px 12px;border-bottom:1px solid var(--border-l);font-size:13px;font-weight:700;color:var(--text2);letter-spacing:.04em;display:flex;align-items:center;justify-content:space-between;border-left:3px solid var(--blue)">
-        移動元<span id="sc" style="font-size:12px;color:var(--text3);font-weight:600">7台</span>
+        移動元<span id="sc" style="font-size:12px;color:var(--text3);font-weight:600">0台</span>
       </div>
       <div id="src-list"></div>
     </div>
     <div class="card" style="margin-bottom:0">
       <div style="padding:9px 12px;border-bottom:1px solid var(--border-l);font-size:13px;font-weight:700;color:var(--text2);letter-spacing:.04em;display:flex;align-items:center;justify-content:space-between;border-left:3px solid var(--red)">
-        移動先<span id="dc" style="font-size:12px;color:var(--text3);font-weight:600">7台</span>
+        移動先<span id="dc" style="font-size:12px;color:var(--text3);font-weight:600">0台</span>
       </div>
       <div id="dst-list"></div>
     </div>
   </div>
 
-  <div id="pairs-wrap" style="display: none;"></div>
+  <div id="pairs-wrap" style="display: block;"></div>
 
   <div class="card">
     <div class="card-head" style="background:#eafaf1;cursor:default">
       <span class="card-title" style="color:#1e8449">🏠 ハブ在庫状況</span>
-      <span style="font-size:11px;color:#1e8449;margin-left:auto" id="hub-summary-txt">3/10拠点 充足</span>
+      <span style="font-size:11px;color:#1e8449;margin-left:auto" id="hub-summary-txt">0/10拠点 充足</span>
     </div>
     <div id="hub-status-body" style="padding:8px 14px 10px;display:flex;flex-wrap:wrap;gap:6px"></div>
   </div>
   
-  <div id="field-window-bar" style="display: block;"></div>
+  <div id="field-window-bar" style="display: none;"></div>
   <div id="map-label-bar" style="display: flex;">
     <span class="ml-lab">🏷 地図ラベル</span>
     <span class="lbl-chip" id="lbl-num" onclick="setMapLabelMode('num')">番号のみ</span>
     <span class="lbl-chip on" id="lbl-numname" onclick="setMapLabelMode('numname')">番号＋名前</span>
     <span class="lbl-chip" id="lbl-none" onclick="setMapLabelMode('none')">なし</span>
   </div>
-  <div id="map-container" class="leaflet-container leaflet-touch leaflet-retina leaflet-fade-anim leaflet-grab leaflet-touch-drag leaflet-touch-zoom" tabindex="0" style="display: none; position: relative; margin-bottom: 20px; outline-style: none;"><div class="leaflet-pane leaflet-map-pane" style="transform: translate3d(-329px, 327px, 0px);"><div class="leaflet-pane leaflet-tile-pane"><div class="leaflet-layer " style="z-index: 1; opacity: 1;"><div class="leaflet-tile-container leaflet-zoom-animated" style="z-index: 19; transform: translate3d(-101px, 247px, 0px) scale(1);"><img alt="" src="https://tile.openstreetmap.jp/16/57170/26103.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(406px, -148px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57170/26104.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(406px, 108px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57169/26103.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(150px, -148px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57171/26103.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(662px, -148px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57169/26104.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(150px, 108px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57171/26104.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(662px, 108px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57169/26102.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(150px, -404px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57170/26102.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(406px, -404px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57168/26103.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-106px, -148px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57168/26104.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-106px, 108px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57169/26105.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(150px, 364px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57170/26105.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(406px, 364px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57168/26102.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-106px, -404px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57171/26102.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(662px, -404px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57168/26105.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-106px, 364px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57171/26105.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(662px, 364px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57172/26103.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(918px, -148px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57172/26102.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(918px, -404px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57172/26104.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(918px, 108px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57173/26103.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(1174px, -148px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57173/26102.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(1174px, -404px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57173/26104.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(1174px, 108px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57171/26101.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(662px, -660px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57172/26101.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(918px, -660px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57170/26101.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(406px, -660px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57173/26101.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(1174px, -660px, 0px); opacity: 1;"><img alt="" src="https://tile.openstreetmap.jp/16/57169/26101.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(150px, -660px, 0px); opacity: 1;"></div><div class="leaflet-tile-container leaflet-zoom-animated" style="z-index: 18; transform: translate3d(-101px, 247px, 0px) scale(0.5);"></div></div></div><div class="leaflet-pane leaflet-overlay-pane"><svg pointer-events="none" class="leaflet-zoom-animated" width="953" height="646" viewBox="250 -381 953 646" style="transform: translate3d(250px, -381px, 0px);"><g><path class="leaflet-interactive" stroke="var(--orange)" stroke-opacity="0.7" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 10" fill="none" d="M754 168L927 149L827 -18L442 -31"></path></g></svg></div><div class="leaflet-pane leaflet-shadow-pane"></div><div class="leaflet-pane leaflet-marker-pane"><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-323" style="margin-left: -22.5px; margin-top: -13px; width: 45px; height: 26px; transform: translate3d(754px, 168px, 0px); z-index: 168;"><div style="background-color:#1e8449;color:#fff;border-radius:13px;min-width:45px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap;box-sizing:border-box"><span style="background:#fff;color:#1565c0;border-radius:8px;padding:0 4px;margin-right:4px;font-size:11px">元</span>1</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-326" style="margin-left: -12px; margin-top: -13px; width: 24px; height: 26px; transform: translate3d(927px, 149px, 0px); z-index: 149;"><div style="background-color:#f57c00;color:#fff;border-radius:13px;min-width:24px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap;box-sizing:border-box">2</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-329" style="margin-left: -12px; margin-top: -13px; width: 24px; height: 26px; transform: translate3d(827px, -18px, 0px); z-index: -18;"><div style="background-color:#1565c0;color:#fff;border-radius:13px;min-width:24px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap;box-sizing:border-box">3</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-332" style="margin-left: -22.5px; margin-top: -13px; width: 45px; height: 26px; transform: translate3d(442px, -31px, 0px); z-index: -31;"><div style="background-color:#c62828;color:#fff;border-radius:13px;min-width:45px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap;box-sizing:border-box"><span style="background:#fff;color:#f57c00;border-radius:8px;padding:0 4px;margin-right:4px;font-size:11px">先</span>4</div></div></div><div class="leaflet-pane leaflet-tooltip-pane"><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-323" style="opacity: 0.9; transform: translate3d(778.5px, 158px, 0px);">025 GRANLAB 丸の内</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-326" style="opacity: 0.9; transform: translate3d(941px, 139px, 0px);">029 エコ城東町1-1</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-329" style="opacity: 0.9; transform: translate3d(841px, -28px, 0px);">044 エコ北浜町第1</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-332" style="opacity: 0.9; transform: translate3d(466.5px, -41px, 0px);">033 高速バスタ前</div></div><div class="leaflet-pane leaflet-popup-pane"></div><div class="leaflet-proxy leaflet-zoom-animated" style="transform: translate3d(1.46359e+07px, 6.68221e+06px, 0px) scale(32768);"></div></div><div class="leaflet-control-container"><div class="leaflet-top leaflet-left"><div class="leaflet-control-zoom leaflet-bar leaflet-control"><a class="leaflet-control-zoom-in" href="#" title="Zoom in" role="button" aria-label="Zoom in" aria-disabled="false"><span aria-hidden="true">+</span></a><a class="leaflet-control-zoom-out" href="#" title="Zoom out" role="button" aria-label="Zoom out" aria-disabled="false"><span aria-hidden="true">−</span></a></div></div><div class="leaflet-top leaflet-right"><div class="leaflet-control-layers leaflet-control" aria-haspopup="true"><a class="leaflet-control-layers-toggle" href="#" title="Layers" role="button"></a><section class="leaflet-control-layers-list"><div class="leaflet-control-layers-base"><label><span><input type="radio" class="leaflet-control-layers-selector" name="leaflet-base-layers_57" checked="checked"><span> OSM標準（OSM日本）</span></span></label><label><span><input type="radio" class="leaflet-control-layers-selector" name="leaflet-base-layers_57"><span> 地理院 淡色（印刷向け）</span></span></label><label><span><input type="radio" class="leaflet-control-layers-selector" name="leaflet-base-layers_57"><span> 地理院 標準</span></span></label></div><div class="leaflet-control-layers-separator" style="display: none;"></div><div class="leaflet-control-layers-overlays"></div></section></div></div><div class="leaflet-bottom leaflet-left"><div class="leaflet-control" style="background: rgba(255, 255, 255, 0.92); color: rgb(34, 34, 34); padding: 6px 10px; border-radius: 8px; box-shadow: rgba(0, 0, 0, 0.3) 0px 1px 4px; font-size: 12px; line-height: 1.9; font-weight: 600;"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#1565c0;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25);vertical-align:-2px;margin-right:4px"></span>移動元　<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#f57c00;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25);vertical-align:-2px;margin-right:4px"></span>移動先　<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#616161;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25);vertical-align:-2px;margin-right:4px"></span>その他<br><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#1e8449;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25);vertical-align:-2px;margin-right:4px"></span>起点　<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#c62828;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25);vertical-align:-2px;margin-right:4px"></span>終点</div></div><div class="leaflet-bottom leaflet-right"><div class="leaflet-control-attribution leaflet-control"><a href="https://leafletjs.com" title="A JavaScript library for interactive maps"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8" class="leaflet-attribution-flag"><path fill="#4C7BE1" d="M0 0h12v4H0z"></path><path fill="#FFD500" d="M0 4h12v3H0z"></path><path fill="#E0BC00" d="M0 7h12v1H0z"></path></svg> Leaflet</a> <span aria-hidden="true">|</span> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</div></div></div></div>
-  <div id="route-wrap" style="display: none;"></div>
+  <div id="map-container" class="leaflet-container leaflet-touch leaflet-retina leaflet-fade-anim leaflet-grab leaflet-touch-drag leaflet-touch-zoom" tabindex="0" style="display: none; position: relative; margin-bottom: 20px;"><div class="leaflet-pane leaflet-map-pane" style="transform: translate3d(-201px, 197px, 0px);"><div class="leaflet-pane leaflet-tile-pane"><div class="leaflet-layer " style="z-index: 1; opacity: 1;"><div class="leaflet-tile-container leaflet-zoom-animated" style="z-index: 17; transform: translate3d(524px, 204px, 0px) scale(0.5);"></div><div class="leaflet-tile-container leaflet-zoom-animated" style="z-index: 18; transform: translate3d(408px, 145px, 0px) scale(1);"></div></div></div><div class="leaflet-pane leaflet-overlay-pane"><svg pointer-events="none" class="leaflet-zoom-animated" width="954" height="647" viewBox="122 -251 954 647" style="transform: translate3d(122px, -251px, 0px);"><g><path class="leaflet-interactive" stroke="var(--blue)" stroke-opacity="0.8" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" d="M762 255L751 251L736 298L756 300L756 302L756 300L736 298L746 270L751 251L762 254L760 269L758 269L760 269L761 263L735 256L743 226L746 200L739 198L739 195L737 194L750 110L758 110L758 100L767 101L768 88L766 88L768 88L766 123L749 122L738 195L735 198L734 205L732 225L742 227L733 264L782 276L782 272L781 277L733 265L743 226L746 200L739 198L739 195L737 194L750 115L749 114L750 110L758 110L758 100L766 100L767 96L763 93L763 89L762 93L768 94L766 123L749 122L738 195L735 198L731 240L729 242L725 259L723 261L720 260L719 263L720 260L723 261L725 259L729 242L731 240L734 205L735 199L738 195L737 194L739 180L750 115L746 93L749 93L744 80L744 73L757 67L756 66L759 65L759 63L767 61L759 63L759 65L756 66L757 67L728 82L704 90L706 97L690 104L680 98L679 102L675 100L668 101L661 107L664 116L668 114L669 115L673 128L672 157L667 177L671 177L665 177L670 157L673 129L669 115L743 92L749 93L744 80L744 73L757 67L756 66L759 65L759 63L767 61L759 63L759 65L756 66L757 67L744 75L744 80L749 93L744 92L738 94L737 118L739 118L737 140L722 139L719 156L696 154L690 185L687 186L687 193L675 248L652 241L650 244L639 240L638 244L633 247L634 250L638 253L636 257L635 270L633 275L631 275"></path></g></svg></div><div class="leaflet-pane leaflet-shadow-pane"></div><div class="leaflet-pane leaflet-marker-pane"><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-867" style="margin-left: -19px; margin-top: -13px; width: 38px; height: 26px; transform: translate3d(761px, 255px, 0px); z-index: 255;"><div style="background-color:green;color:#fff;border-radius:13px;min-width:38px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">1・3</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-870" style="margin-left: -12px; margin-top: -13px; width: 24px; height: 26px; transform: translate3d(755px, 302px, 0px); z-index: 302;"><div style="background-color:blue;color:#fff;border-radius:13px;min-width:24px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">2</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-873" style="margin-left: -12px; margin-top: -13px; width: 24px; height: 26px; transform: translate3d(757px, 269px, 0px); z-index: 269;"><div style="background-color:blue;color:#fff;border-radius:13px;min-width:24px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">4</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-876" style="margin-left: -12px; margin-top: -13px; width: 24px; height: 26px; transform: translate3d(766px, 89px, 0px); z-index: 89;"><div style="background-color:blue;color:#fff;border-radius:13px;min-width:24px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">5</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-879" style="margin-left: -12px; margin-top: -13px; width: 24px; height: 26px; transform: translate3d(783px, 272px, 0px); z-index: 272;"><div style="background-color:blue;color:#fff;border-radius:13px;min-width:24px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">6</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-882" style="margin-left: -12px; margin-top: -13px; width: 24px; height: 26px; transform: translate3d(762px, 89px, 0px); z-index: 89;"><div style="background-color:blue;color:#fff;border-radius:13px;min-width:24px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">7</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-885" style="margin-left: -12px; margin-top: -13px; width: 24px; height: 26px; transform: translate3d(718px, 262px, 0px); z-index: 262;"><div style="background-color:blue;color:#fff;border-radius:13px;min-width:24px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">8</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-888" style="margin-left: -23px; margin-top: -13px; width: 46px; height: 26px; transform: translate3d(766px, 60px, 0px); z-index: 60;"><div style="background-color:blue;color:#fff;border-radius:13px;min-width:46px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">9・11</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-891" style="margin-left: -15px; margin-top: -13px; width: 30px; height: 26px; transform: translate3d(670px, 178px, 0px); z-index: 178;"><div style="background-color:blue;color:#fff;border-radius:13px;min-width:30px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">10</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-894" style="margin-left: -15px; margin-top: -13px; width: 30px; height: 26px; transform: translate3d(632px, 276px, 0px); z-index: 276;"><div style="background-color:red;color:#fff;border-radius:13px;min-width:30px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">12</div></div></div><div class="leaflet-pane leaflet-tooltip-pane"><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-867" style="opacity: 0.9; transform: translate3d(782px, 245px, 0px);">001 ドコモ四国ビル</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-870" style="opacity: 0.9; transform: translate3d(769px, 292px, 0px);">015 テック中央町第1</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-873" style="opacity: 0.9; transform: translate3d(771px, 259px, 0px);">024 セントラルスカイ</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-876" style="opacity: 0.9; transform: translate3d(780px, 79px, 0px);">032 青鬼くん前</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-879" style="opacity: 0.9; transform: translate3d(797px, 262px, 0px);">047 セントラル田町ビル No.1</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-882" style="opacity: 0.9; transform: translate3d(776px, 79px, 0px);">033 高速バスタ前</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-885" style="opacity: 0.9; transform: translate3d(732px, 252px, 0px);">041 テック八本松第1</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-888" style="opacity: 0.9; transform: translate3d(791px, 50px, 0px);">003 高松シンボルタワー</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-891" style="opacity: 0.9; transform: translate3d(687px, 168px, 0px);">043 ファロス第一ビル</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-894" style="opacity: 0.9; transform: translate3d(649px, 266px, 0px);">037 石清尾八幡宮（いわせお）</div></div><div class="leaflet-pane leaflet-popup-pane"></div><div class="leaflet-proxy leaflet-zoom-animated" style="transform: translate3d(3.65875e+06px, 1.67054e+06px, 0px) scale(8192);"></div></div><div class="leaflet-control-container"><div class="leaflet-top leaflet-left"><div class="leaflet-control-zoom leaflet-bar leaflet-control"><a class="leaflet-control-zoom-in" href="#" title="Zoom in" role="button" aria-label="Zoom in" aria-disabled="false"><span aria-hidden="true">+</span></a><a class="leaflet-control-zoom-out" href="#" title="Zoom out" role="button" aria-label="Zoom out" aria-disabled="false"><span aria-hidden="true">−</span></a></div></div><div class="leaflet-top leaflet-right"></div><div class="leaflet-bottom leaflet-left"></div><div class="leaflet-bottom leaflet-right"><div class="leaflet-control-attribution leaflet-control"><a href="https://leafletjs.com" title="A JavaScript library for interactive maps"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8" class="leaflet-attribution-flag"><path fill="#4C7BE1" d="M0 0h12v4H0z"></path><path fill="#FFD500" d="M0 4h12v3H0z"></path><path fill="#E0BC00" d="M0 7h12v1H0z"></path></svg> Leaflet</a> <span aria-hidden="true">|</span> © OpenStreetMap contributors</div></div></div></div>
+  <div id="route-wrap" style="display: block;"></div>
 
-  <div id="field-progress-bar" class="progress-bar" style="display: block; margin: 0px -12px;">
+  <div id="field-progress-bar" class="progress-bar" style="display: none; margin: 0px -12px;">
     <div class="progress-fill" id="field-progress" style="width:0%"></div>
   </div>
-  <div id="field-summary" style="margin-bottom: 8px; display: block;"></div>
+  <div id="field-summary" style="margin-bottom: 8px; display: none;"></div>
   <div id="field-recalc-banner" style="display:none" class="recalc-banner">
     🔄 <span id="field-recalc-text">ルートを再計算しました</span>
   </div>
@@ -492,7 +515,7 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
     </div>
   </div>
   
-  <div id="car-map-container" style="height: 540px; width: 100%; border-radius: var(--r10); border: 1px solid var(--border); margin-bottom: 10px; display: none; z-index: 1; position: relative; outline-style: none;" class="leaflet-container leaflet-touch leaflet-retina leaflet-fade-anim leaflet-grab leaflet-touch-drag leaflet-touch-zoom" tabindex="0"></div>
+  <div id="car-map-container" style="height: 540px; width: 100%; border-radius: var(--r10); border: 1px solid var(--border); margin-bottom: 10px; display: none; z-index: 1; position: relative; outline-style: none;" class="leaflet-container leaflet-touch leaflet-retina leaflet-fade-anim leaflet-grab leaflet-touch-drag leaflet-touch-zoom" tabindex="0"><div class="leaflet-pane leaflet-map-pane" style="transform: translate3d(-374px, -321px, 0px);"><div class="leaflet-pane leaflet-tile-pane"><div class="leaflet-layer " style="z-index: 1; opacity: 1;"><div class="leaflet-tile-container leaflet-zoom-animated" style="z-index: 18; transform: translate3d(0px, 0px, 0px) scale(1);"></div></div></div><div class="leaflet-pane leaflet-overlay-pane"><svg pointer-events="none" class="leaflet-zoom-animated" width="0" height="0" viewBox="374 321 0 0" style="transform: translate3d(374px, 321px, 0px);"><g><path class="leaflet-interactive" stroke="var(--blue)" stroke-opacity="0.8" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" d="M0 0"></path></g></svg></div><div class="leaflet-pane leaflet-shadow-pane"></div><div class="leaflet-pane leaflet-marker-pane"><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-376" style="margin-left: -23px; margin-top: -13px; width: 46px; height: 26px; transform: translate3d(372px, 545px, 0px); z-index: 545;"><div style="background-color:green;color:#fff;border-radius:13px;min-width:46px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">1・14</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-379" style="margin-left: -19px; margin-top: -13px; width: 38px; height: 26px; transform: translate3d(426px, 96px, 0px); z-index: 96;"><div style="background-color:blue;color:#fff;border-radius:13px;min-width:38px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">2・4</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-382" style="margin-left: -12px; margin-top: -13px; width: 24px; height: 26px; transform: translate3d(292px, 312px, 0px); z-index: 312;"><div style="background-color:blue;color:#fff;border-radius:13px;min-width:24px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">3</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-385" style="margin-left: -12px; margin-top: -13px; width: 24px; height: 26px; transform: translate3d(330px, 214px, 0px); z-index: 214;"><div style="background-color:blue;color:#fff;border-radius:13px;min-width:24px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">5</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-388" style="margin-left: -12px; margin-top: -13px; width: 24px; height: 26px; transform: translate3d(422px, 125px, 0px); z-index: 125;"><div style="background-color:blue;color:#fff;border-radius:13px;min-width:24px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">6</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-391" style="margin-left: -12px; margin-top: -13px; width: 24px; height: 26px; transform: translate3d(378px, 298px, 0px); z-index: 298;"><div style="background-color:blue;color:#fff;border-radius:13px;min-width:24px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">7</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-394" style="margin-left: -12px; margin-top: -13px; width: 24px; height: 26px; transform: translate3d(426px, 125px, 0px); z-index: 125;"><div style="background-color:blue;color:#fff;border-radius:13px;min-width:24px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">8</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-397" style="margin-left: -12px; margin-top: -13px; width: 24px; height: 26px; transform: translate3d(443px, 308px, 0px); z-index: 308;"><div style="background-color:blue;color:#fff;border-radius:13px;min-width:24px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">9</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-400" style="margin-left: -27px; margin-top: -13px; width: 54px; height: 26px; transform: translate3d(421px, 291px, 0px); z-index: 291;"><div style="background-color:blue;color:#fff;border-radius:13px;min-width:54px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">10・12</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-403" style="margin-left: -15px; margin-top: -13px; width: 30px; height: 26px; transform: translate3d(417px, 305px, 0px); z-index: 305;"><div style="background-color:blue;color:#fff;border-radius:13px;min-width:30px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">11</div></div><div class="leaflet-marker-icon custom-div-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" aria-describedby="leaflet-tooltip-406" style="margin-left: -15px; margin-top: -13px; width: 30px; height: 26px; transform: translate3d(415px, 338px, 0px); z-index: 338;"><div style="background-color:blue;color:#fff;border-radius:13px;min-width:30px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap">13</div></div></div><div class="leaflet-pane leaflet-tooltip-pane"><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-376" style="opacity: 0.9; transform: translate3d(397px, 535px, 0px);">本社（東ハゼ町5-6）</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-379" style="opacity: 0.9; transform: translate3d(447px, 86px, 0px);">003 高松シンボルタワー</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-382" style="opacity: 0.9; transform: translate3d(306px, 302px, 0px);">037 石清尾八幡宮（いわせお）</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-385" style="opacity: 0.9; transform: translate3d(344px, 204px, 0px);">043 ファロス第一ビル</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-388" style="opacity: 0.9; transform: translate3d(436px, 115px, 0px);">033 高速バスタ前</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-391" style="opacity: 0.9; transform: translate3d(392px, 288px, 0px);">041 テック八本松第1</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-394" style="opacity: 0.9; transform: translate3d(440px, 115px, 0px);">032 青鬼くん前</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-397" style="opacity: 0.9; transform: translate3d(457px, 298px, 0px);">047 セントラル田町ビル No.1</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-400" style="opacity: 0.9; transform: translate3d(450px, 281px, 0px);">001 ドコモ四国ビル</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-403" style="opacity: 0.9; transform: translate3d(434px, 295px, 0px);">024 セントラルスカイ</div><div class="leaflet-tooltip port-label leaflet-zoom-animated leaflet-tooltip-right" role="tooltip" id="leaflet-tooltip-406" style="opacity: 0.9; transform: translate3d(432px, 328px, 0px);">015 テック中央町第1</div></div><div class="leaflet-pane leaflet-popup-pane"></div><div class="leaflet-proxy leaflet-zoom-animated" style="transform: translate3d(3.65887e+06px, 1.67076e+06px, 0px) scale(8192);"></div></div><div class="leaflet-control-container"><div class="leaflet-top leaflet-left"><div class="leaflet-control-zoom leaflet-bar leaflet-control"><a class="leaflet-control-zoom-in" href="#" title="Zoom in" role="button" aria-label="Zoom in" aria-disabled="false"><span aria-hidden="true">+</span></a><a class="leaflet-control-zoom-out" href="#" title="Zoom out" role="button" aria-label="Zoom out" aria-disabled="false"><span aria-hidden="true">−</span></a></div></div><div class="leaflet-top leaflet-right"></div><div class="leaflet-bottom leaflet-left"></div><div class="leaflet-bottom leaflet-right"><div class="leaflet-control-attribution leaflet-control"><a href="https://leafletjs.com" title="A JavaScript library for interactive maps"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8" class="leaflet-attribution-flag"><path fill="#4C7BE1" d="M0 0h12v4H0z"></path><path fill="#FFD500" d="M0 4h12v3H0z"></path><path fill="#E0BC00" d="M0 7h12v1H0z"></path></svg> Leaflet</a> <span aria-hidden="true">|</span> © OpenStreetMap contributors</div></div></div></div>
   <div id="car-route-wrap" style="display: block;"></div>
   <div id="car-field-summary" style="margin-bottom: 8px; display: none;"></div>
   <div id="car-field-steps"></div>
@@ -550,13 +573,39 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
       </div>
       <div style="font-size:11px;color:var(--text4);margin-top:5px;line-height:1.6">HUB指定のポートは優先して補充し、そこからは抜きにくくします。<span id="auto-hub-count">現在 10ポートがHUB指定です。</span></div>
 
-      <div id="auto-data-status" style="margin:12px 0 10px"><div style="font-size:11px;color:var(--orange);background:var(--orange-l);border:1px solid #f0d0a0;padding:7px 9px;border-radius:var(--r8);line-height:1.6">
-      ⚠ 貸出・返却の実測値は 44/45 ポートだけです。未入力のポートは自然減率（差し引き）から推定するため、
-      <strong>貸出も返却も多いポート</strong>を見分けられません。設定タブで残りも入力すると精度が上がります。</div></div>
+      <div id="auto-data-status" style="margin:12px 0 10px"><div style="font-size:11px;color:var(--teal);background:var(--teal-l);border:1px solid var(--teal-b);padding:7px 9px;border-radius:var(--r8);line-height:1.6">
+      ✓ 2027年7月の実績を全 44 ポートに反映済み（貸出・返却は回/日）。借りられるか／返せるかを両面で判断します。
+      <br>行き先の構成比（46ポート分）も使い、<strong>返却先が満車になりそうな置き方は価値を下げます</strong>。</div></div>
       <button class="btn" id="calc-auto-btn" onclick="doAutoPlan()" style="width:100%;font-size:15px;background:var(--purple);color:#fff;border-color:var(--purple)">⚡ 自動で移動内容を組む</button>
     </div>
   </div>
   <div id="auto-result"></div>
+</div>
+</div>
+
+<div id="mode-stock" style="display:none">
+<div class="container">
+  <div class="card">
+    <div class="sm-bar">
+      <span style="font-size:15px;font-weight:800">🗺 ポート台数マップ</span>
+      <span class="chip chip-gray" id="sm-total">合計 0台</span>
+      <span class="chip chip-red" id="sm-zero">ゼロ 0</span>
+      <span class="chip" id="sm-short" style="background:var(--orange-l);color:var(--orange)">不足 0</span>
+      <span class="chip chip-sel" id="sm-over">過多 0</span>
+    </div>
+    <div class="sm-bar" style="padding-top:0">
+      <button class="btn btn-blue" id="sm-live-btn" onclick="stockFetchLive()" style="min-height:40px;font-size:14px;padding:8px 14px">🌐 最新台数を取得（計画はそのまま）</button>
+      <button class="btn" onclick="stockCommitToInv()" style="min-height:40px;font-size:14px;padding:8px 14px">📥 この台数を在庫に反映</button>
+      <label style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:4px;margin-left:auto"><input type="checkbox" id="sm-group" checked onchange="renderStockMap()"> グループを合算</label>
+      <label style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:4px"><input type="checkbox" id="sm-names" onchange="renderStockMap()"> 名前を表示</label>
+    </div>
+    <div class="sm-src" id="sm-src">—</div>
+  </div>
+  <div id="stock-map"></div>
+  <div class="card">
+    <div class="card-head" style="cursor:default"><span style="font-weight:700">完了・手修正で台数が変わったポート</span></div>
+    <div class="sm-list" id="sm-list"></div>
+  </div>
 </div>
 </div>
 
@@ -612,7 +661,7 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
           <input type="number" id="p-sig-prob" value="30" min="0" max="100" step="5" style="width:68px;font-family:inherit;font-size:14px;padding:5px 8px;border:1.5px solid var(--border);border-radius:6px">
           <span style="font-size:12px;color:var(--text3)">% 平均待ち</span>
           <input type="number" id="p-sig-wait" value="0.8" min="0" max="3" step="0.1" style="width:68px;font-family:inherit;font-size:14px;padding:5px 8px;border:1.5px solid var(--border);border-radius:6px">
-          <span style="font-size:12px;color:var(--text3)">分 → 係数: <b id="p-sig-coef">0.000857</b></span>
+          <span style="font-size:12px;color:var(--text3)">分 → 係数: <b id="p-sig-coef">0.000686</b></span>
         </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
@@ -755,7 +804,7 @@ const ALL_PORTS=[
   {no:"029",name:"エコ城東町1-1",rank:"A",lower:3,target:4,upper:6,nat:0.059,lat:34.34709,lng:134.057526,out:1.161,back:1.032,capacity:6,hub:true},
   {no:"030",name:"テック今新町第1",rank:"C",lower:0,target:1,upper:2,nat:-0.168,lat:34.343744,lng:134.054714,out:0.161,back:0.226,capacity:4},
   {no:"031",name:"愛宕神社",rank:"C",lower:0,target:1,upper:3,nat:0,lat:34.347743,lng:134.037641,out:0.129,back:0.129,capacity:3},
-  {no:"032",name:"青鬼くん前",rank:"S",lower:2,target:3,upper:4,nat:0.006,lat:34.350253,lng:134.047477,out:2.548,back:2.516,capacity:5},
+  {no:"032",name:"青鬼くん前",rank:"S",lower:1,target:2,upper:4,nat:0.006,lat:34.350253,lng:134.047477,out:2.548,back:2.516,capacity:5},
   {no:"033",name:"高速バスタ前",rank:"S",lower:2,target:3,upper:5,nat:-0.003,lat:34.350269,lng:134.047132,out:5.065,back:5.097,capacity:5},
   {no:"034",name:"第一生命ビル",rank:"C",lower:0,target:1,upper:2,nat:-0.168,lat:34.348288,lng:134.047518,out:0.161,back:0.226,capacity:4},
   {no:"035",name:"日本生命高松駅前",rank:"B",lower:0,target:1,upper:3,nat:-0.096,lat:34.350428,lng:134.048418,out:0.452,back:0.548,capacity:5},
@@ -772,11 +821,23 @@ const ALL_PORTS=[
   {no:"046",name:"グローバルセンター",rank:"C",lower:0,target:1,upper:2,nat:-0.11,lat:34.32027,lng:134.041416,out:0.129,back:0.161,capacity:10},
   {no:"047",name:"セントラル田町ビル No.1",rank:"B",lower:1,target:1,upper:2,nat:0.267,lat:34.33724,lng:134.048873,out:0.613,back:0.355,capacity:2},
   {no:"048",name:"セントラル田町ビル No.2",rank:"C",lower:1,target:2,upper:3,nat:0.579,lat:34.337045,lng:134.049171,out:0.484,back:0.129,capacity:3},
-  {no:"049",name:"高松予備校",rank:"C",lower:0,target:1,upper:2,nat:0,lat:34.334282,lng:134.063568,liveOptional:true}
+  // 2026年10月新設。設定値は仮（設定タブで調整）。公開データに未掲載の間は自動取得で照合できなくてもエラーにしない
+  {no:"049",name:"高松予備校",rank:"C",lower:0,target:1,upper:2,nat:0,lat:34.334282,lng:134.063568,capacity:null,liveOptional:true}
 ];
 const PM={};ALL_PORTS.forEach(p=>PM[p.no]=p);
 const START=PM["046"];
 const RR={S:4,A:3,B:2,C:1,D:0};
+// ── 合算グループ ──
+// 隣接していて利用者がどちらにも返す・借りるポートは、1か所として台数を考える。
+// 移動元／移動先の判定（手動・自動とも）はグループ合計で行い、グループ内どうしの移動は作らない。
+const PORT_GROUPS=[
+  {id:'station', name:'高松駅（青鬼くん・バスタ）', nos:['032','033']},
+  {id:'ntt',     name:'NTT西（香川大学前）',       nos:['026','027','028']},
+  {id:'tamachi', name:'セントラル田町',             nos:['047','048']}
+];
+const GROUP_OF={};PORT_GROUPS.forEach(g=>g.nos.forEach(no=>GROUP_OF[no]=g));
+function sameGroup(a,b){const g=GROUP_OF[a];return !!g&&g===GROUP_OF[b];}
+function groupKey(no){const g=GROUP_OF[no];return g?'G:'+g.id:no;}
 // 2027年7月実績のOD構成比（発ポート → 主な着ポートの割合）。
 // 「そのポートに置いた自転車が、どこへ返されるか」を表す。返却先が満車だと利用が成立しないため、
 // 貸出の価値をこの構成比で割り引くのに使う。3%未満の行き先は省いている。
@@ -832,8 +893,13 @@ const OD_MONTH='2027年7月';
 
 
 const LS_INV='shsac6_inv',LS_PARAMS='shsac6_params',LS_PORTS='shsac6_ports',LS_COMMUTE='shsac6_commute',LS_VER='shsac6_ver';
-const EMBED_VER=1791887552721;
-function lsSave(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){console.warn('LS save failed',e);}}
+const EMBED_VER=1790757743354;
+function lsSave(k,v){
+  if(k===LS_INV){INV_AT=Date.now();try{localStorage.setItem('shsac6_inv_at',JSON.stringify(INV_AT));}catch(e){}}
+  try{localStorage.setItem(k,JSON.stringify(v));}catch(e){console.warn('LS save failed',e);}
+}
+// 在庫(INV)を最後に更新した時刻。台数マップで「どの完了を足すか」の基準に使う
+let INV_AT=(()=>{try{return JSON.parse(localStorage.getItem('shsac6_inv_at'))||0;}catch(e){return 0;}})();
 function lsLoad(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}}
 function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
 
@@ -907,10 +973,10 @@ function loadFromLS(){
   const ic=lsLoad('shsac6_invcol'); if(ic==='avail'||ic==='parked')invCol=ic;
 }
 // ────────────────────────────────────────────────────────────────────────────
-let WALK_SPD=4,BIKE_SPD=15,VEH_THR=500,BOARD=1,ALIGHT=1;
+let WALK_SPD=4,BIKE_SPD=10,VEH_THR=500,BOARD=1.5,ALIGHT=1.5;
 let CAR_SPD=20,CAR_LOAD=2,CAR_UNLOAD=2;
 let carMaxLoad=1; // 積載台数（1台 or 2台）
-let _SIG_INTERVAL=350,_SIG_PROB=0.3,_SIG_WAIT=1;
+let _SIG_INTERVAL=350,_SIG_PROB=0.3,_SIG_WAIT=0.8;
 
 function sigMin(m){return m*(_SIG_WAIT*_SIG_PROB/_SIG_INTERVAL);}
 function updateSigCoef(){
@@ -1030,6 +1096,12 @@ function classify(p){
   return 'ok';
 }
 function portNoFrom(str){return str.split('.')[0];}
+function groupTag(no){
+  const g=GROUP_OF[no]; if(!g)return'';
+  const sum=g.nos.reduce((a,n)=>a+(INV[n]??0),0), tgt=g.nos.reduce((a,n)=>a+(PM[n]?.target||0),0);
+  const col=sum<tgt?'var(--orange)':'var(--teal)', bg=sum<tgt?'var(--orange-l)':'var(--teal-l)';
+  return `<span title="${g.name}：${g.nos.join('・')}を合算して判定" style="font-size:10px;padding:1px 6px;border-radius:4px;background:${bg};color:${col};font-weight:700;flex-shrink:0;white-space:nowrap">🔗${g.name.split('（')[0]} 計${sum}/目標${tgt}</span>`;
+}
 function rnkTag(r){return`<span class="rnk r${r}">${r}</span>`;}
 function hubTag(p){return p.hub?`<span style="font-size:10px;padding:1px 5px;border-radius:4px;background:#1e8449;color:#fff;font-weight:700;flex-shrink:0">HUB</span>`:'';}
 function travelMin(dist,spd){return dist/1000/spd*60+sigMin(dist);}
@@ -1422,7 +1494,7 @@ function dstNeedCount(no){
   const p=PM[no]; if(!p||!autoMovable(p))return 0;
   const need=autoCanTake(no).need;
   // 在庫ゼロ／下限以下のポートは、目標0でも1台は選べるようにする（従来の挙動を維持）
-  const legacy=classify(p)==='dst'?Math.max(needed(no),1):0;
+  const legacy=(!GROUP_OF[no]&&classify(p)==='dst')?Math.max(needed(no),1):0;   // グループはグループ合計で判定
   return Math.max(need,legacy);
 }
 // 上限までの余地ぶん（畳んでいる部分）
@@ -1450,7 +1522,7 @@ function buildPairsOptimized(){
   const startPort=commuteGo?PM[commuteGo]:START;
 
   // ── ①初期割当：走行距離だけを見た貪欲法＋ペア入替。同時最適化の出発点（種）として使う ──
-  const D=veh.map(v=>dst.map(d=>gd(PM[v.from],PM[d])));
+  const D=veh.map(v=>dst.map(d=>gd(PM[v.from],PM[d])+(sameGroup(v.from,d)?1e6:0)));   // グループ内どうしは組ませない
   const assign=Array(n).fill(-1);const used=new Set();
   veh.forEach((v,i)=>{let best=-1,bd=Infinity;dst.forEach((d,j)=>{if(!used.has(j)&&D[i][j]<bd){bd=D[i][j];best=j;}});assign[i]=best>=0?best:0;if(best>=0)used.add(best);});
   let improved=true,iter=0;
@@ -1473,6 +1545,7 @@ function calcRouteTimeFrom(route,startPort){
   route.forEach(m=>{
     const wd=gd(pos,PM[m.from]);t+=travelMin(wd,WALK_SPD);
     const rd=m.dist||Math.round(gd(PM[m.from],PM[m.to]));t+=travelMin(rd,BIKE_SPD)+BOARD+ALIGHT;
+    if(sameGroup(m.from,m.to))t+=10000;   // グループ内どうしの移動は事実上禁止
     pos=PM[m.to];
   });
   return t;
@@ -1715,6 +1788,7 @@ async function confirmSkipRide(reason){
 function markStep(id,status){
   if(status==='skip'){const s=flatSteps.find(x=>x.id===id);if(s&&s.kind==='ride'){showSkipModal(id);return;}}
   stepStatus[id]=status;
+  if(status==='done')stepDoneAt[id]=Date.now();else delete stepDoneAt[id];
   if(!status)document.getElementById('field-recalc-banner').style.display='none';
   renderField();
 }
@@ -1777,7 +1851,7 @@ function renderSrc(){
     const sur=Math.max(0,surplus(p.no));       // 目標を上回っている分
     const isGo=commuteGo===p.no;
     const highNat=p.nat>=0.2;
-    h+=`<div class="port-hd">${rnkTag(p.rank)}${hubTag(p)}<span class="port-nm">${p.no}.${p.name}</span>`;
+    h+=`<div class="port-hd">${rnkTag(p.rank)}${hubTag(p)}<span class="port-nm">${p.no}.${p.name}</span>${groupTag(p.no)}`;
     if(isGo)h+=`<span class="chip chip-ok" style="font-size:11px;padding:2px 7px">+1持込</span>`;
     h+=`<span style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;gap:1px">
       <span class="port-inf">${adjInv(p.no)}台 ${sur>0?`目標+${sur}`:`目標ちょうど`}・下限${p.lower}</span>
@@ -1814,7 +1888,7 @@ function renderDst(){
     if(n<=0)return;
     const short=(d.target||0)-cur;
     const highNat=d.nat>=0.2;
-    h+=`<div class="port-hd">${rnkTag(d.rank)}${hubTag(d)}<span class="port-nm">${d.no}.${d.name}</span>`;
+    h+=`<div class="port-hd">${rnkTag(d.rank)}${hubTag(d)}<span class="port-nm">${d.no}.${d.name}</span>${groupTag(d.no)}`;
     if(isRet)h+=`<span class="tag-ret" style="font-size:11px;padding:2px 6px;margin-left:2px;flex-shrink:0">帰宅</span>`;
     if(classify(d)!=='dst')h+=`<span class="chip" style="font-size:10px;padding:2px 6px;background:var(--purple-l);color:var(--purple);border:1px solid #d9c9ef">⚡自動</span>`;
     h+=`<span style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;gap:1px">
@@ -2344,7 +2418,7 @@ function onCommuteChange(){
 // ════════════════════════════════════════════════
 function switchMode(mode){
   currentMode=mode;
-  ['plan','car','auto'].forEach(m=>{
+  ['plan','car','auto','stock'].forEach(m=>{
     document.getElementById('mode-'+m).style.display=mode===m?'block':'none';
     document.getElementById('tab-'+m).className='mode-tab'+(mode===m?' active':'');
   });
@@ -2374,6 +2448,7 @@ function switchMode(mode){
     renderAutoDataStatus();renderAutoResult();
   }
   if(mode==='settings')renderSettingsTable();
+  if(mode==='stock')renderStockMap(true);
 }
 
 // ════════════════════════════════════════════════
@@ -2783,7 +2858,7 @@ function renderCarField(){
   document.getElementById('car-print-table').innerHTML=cpHTML;
 }
 
-function markCarStep(id,status){carStepStatus[id]=status;renderCarField();}
+function markCarStep(id,status){carStepStatus[id]=status;if(status==='done')carStepDoneAt[id]=Date.now();else delete carStepDoneAt[id];renderCarField();}
 function resetCarField(){
   document.getElementById('car-route-wrap').style.display='block';
   document.getElementById('car-field-summary').style.display='none';
@@ -2983,7 +3058,7 @@ function buildPortsJsString(){
 function downloadEmbeddedHTML(){
   const CLEAR_IDS=['route-wrap','pairs-wrap','print-table','car-print-table','car-route-wrap',
     'car-pair-summary','car-field-steps','field-steps','field-window-bar','field-summary','car-field-summary',
-    'settings-tbody','src-list','dst-list','hub-status-body','paste-input','inv-file-names'];
+    'settings-tbody','src-list','dst-list','hub-status-body','paste-input','inv-file-names','stock-map','sm-list'];
   const _saved={};
   CLEAR_IDS.forEach(id=>{const el=document.getElementById(id);if(el){_saved[id]=el.innerHTML;el.innerHTML='';}});
   const _ps=document.getElementById('paste-status'),_psTxt=_ps?_ps.textContent:'';
@@ -3187,10 +3262,39 @@ function portReturnability(no,curMap){
 }
 function autoCanGive(no){
   const p=PM[no]; if(!p||!autoMovable(p))return 0;
+  if(GROUP_OF[no])return groupAlloc(GROUP_OF[no]).give[no]||0;
   return Math.max(0,(INV[no]??0)-Math.max(p.lower||0,1));
+}
+// グループ合計で「出せる台数／足りない台数／入れられる余地」を出し、各ポートへ割り振る。
+//   出す … 合計 − max(下限合計,1)。ただし各ポートも自分の下限・1台を割らない範囲で、余っている所から
+//   足りない … min(目標合計, 受入上限合計) − 合計。目標に対して一番足りない所へ
+//   余地 … 受入上限合計 − max(合計, 目標合計)。空きが一番大きい所へ
+function groupAlloc(g){
+  const M=g.nos.filter(no=>PM[no]&&autoMovable(PM[no]));
+  const inv={},give={},need={},room={};
+  let sInv=0,sLow=0,sTgt=0,sCeil=0;
+  M.forEach(no=>{const p=PM[no];inv[no]=INV[no]??0;sInv+=inv[no];sLow+=p.lower||0;sTgt+=p.target||0;sCeil+=portCeil(no);give[no]=0;need[no]=0;room[no]=0;});
+  const pick=(total,capOf,scoreOf,out)=>{
+    for(let k=0;k<total;k++){
+      let best=null,bs=-Infinity;
+      M.forEach(no=>{if(out[no]>=capOf(no))return;const sc=scoreOf(no);if(sc>bs){bs=sc;best=no;}});
+      if(!best)break; out[best]++;
+    }
+  };
+  pick(Math.max(0,sInv-Math.max(sLow,1)),
+       no=>Math.max(0,inv[no]-Math.max(PM[no].lower||0,1)),
+       no=>inv[no]-give[no]-(PM[no].target||0), give);
+  pick(Math.max(0,Math.min(sTgt,sCeil)-sInv),
+       no=>Math.max(0,Math.min(PM[no].target||0,portCeil(no))-inv[no]),
+       no=>(PM[no].target||0)-inv[no]-need[no], need);
+  pick(Math.max(0,sCeil-Math.max(sInv,sTgt)),
+       no=>Math.max(0,portCeil(no)-Math.max(inv[no]+need[no],PM[no].target||0)),
+       no=>portCeil(no)-inv[no]-need[no]-room[no], room);
+  return{give,need,room,sInv,sLow,sTgt,sCeil};
 }
 function autoCanTake(no){
   const p=PM[no]; if(!p||!autoMovable(p))return{need:0,room:0};
+  if(GROUP_OF[no]){const a=groupAlloc(GROUP_OF[no]);return{need:a.need[no]||0,room:a.room[no]||0};}
   const inv=INV[no]??0;
   const ceil=portCeil(no);
   const need=Math.max(0,Math.min(p.target||0,ceil)-inv);
@@ -3252,9 +3356,9 @@ function buildAutoPlan(nBikes,opts){
     while(taken<limit){
       let best=null;
       Object.keys(give).forEach(from=>{
-        if(give[from]<=0||usedAsDst.has(from))return;
+        if(give[from]<=0||usedAsDst.has(groupKey(from)))return;
         Object.keys(pool).forEach(to=>{
-          if(pool[to]<=0||from===to||usedAsSrc.has(to))return;
+          if(pool[to]<=0||from===to||sameGroup(from,to)||usedAsSrc.has(groupKey(to)))return;
           const b=breakdown(from,to);
           if(b.v<=0)return;
           if(!best||b.v>best.v)best=Object.assign({from,to},b);
@@ -3263,7 +3367,7 @@ function buildAutoPlan(nBikes,opts){
       if(!best)break;
       give[best.from]--;pool[best.to]--;
       cur[best.from]--;cur[best.to]++;          // 効きの逓減を効かせるため在庫を進める
-      usedAsSrc.add(best.from);usedAsDst.add(best.to);
+      usedAsSrc.add(groupKey(best.from));usedAsDst.add(groupKey(best.to));
       moves.push(Object.assign({phase,value:best.v},best));
       taken++;
     }
@@ -3585,6 +3689,223 @@ initLiveInventory();
     document.getElementById('pwa-update-close').onclick=function(){ b.remove(); };
   }
 })();
+// ════════════════════════════════════════════════
+// §14 計算して現場モードへ（件数指定）
+// ════════════════════════════════════════════════
+async function doRouteField(n){
+  const before=flatSteps;
+  document.querySelectorAll('.fq-btn').forEach(b=>b.disabled=true);
+  try{ await doRoute(); }
+  finally{ document.querySelectorAll('.fq-btn').forEach(b=>b.disabled=false); }
+  if(!flatSteps.length||flatSteps===before) return;   // 未選択などで計算されなかった
+  fieldWin.size=n; lsSave('shsac6_winsize', n);
+  startField();
+}
+
+// ════════════════════════════════════════════════
+// §15 台数マップ（🗺 台数タブ）
+// 表示台数 ＝ 基準の台数 ＋ 基準時刻より後に「完了」にした移動 ＋ 手修正
+//   基準は「在庫（計画の元データ）」か「このタブで取った最新データ」の新しいほう。
+//   このタブの取得は在庫・計画に触れないので、移動計画は白紙にならない。
+// ════════════════════════════════════════════════
+let stepDoneAt={}, carStepDoneAt={};
+let stockLive=null;        // {values, at(ms), dataAt(ms), notListed[], unavailable[]}
+let stockManual=[];        // [{no, d, at}]
+let stockMap=null, stockMarkers=[], stockFitted=false, stockLiveBusy=false;
+
+// 1つのステップが動かす台数 [[ポート, 増減], ...]
+function stepDeltas(s){
+  const f=portNoFrom(s.from||''), t=portNoFrom(s.to||'');
+  if(s.kind==='ride'||s.kind==='go'||s.kind==='ret') return [[f,-1],[t,+1]];
+  if(s.kind==='car-pickup') return [[t,-(s.nBikes||1)]];
+  if(s.kind==='car-drop')   return [[t,+(s.nUnload||1)]];
+  return [];
+}
+function stockEvents(){
+  const ev=[];
+  flatSteps.forEach(s=>{
+    const st=stepStatus[s.id];
+    stepDeltas(s).forEach(([no,d])=>{ if(PM[no]) ev.push({no,d,st,at:st==='done'?(stepDoneAt[s.id]||0):0,src:'plan',key:'p'+s.id}); });
+  });
+  (typeof carFlatSteps!=='undefined'?carFlatSteps:[]).forEach(s=>{
+    const st=carStepStatus[s.id];
+    stepDeltas(s).forEach(([no,d])=>{ if(PM[no]) ev.push({no,d,st,at:st==='done'?(carStepDoneAt[s.id]||0):0,src:'car',key:'c'+s.id}); });
+  });
+  stockManual.forEach((m,i)=>ev.push({no:m.no,d:m.d,st:'done',at:m.at,src:'manual',key:'m'+i}));
+  return ev;
+}
+function stockBase(){
+  if(stockLive && stockLive.at>=INV_AT) return {values:stockLive.values, at:stockLive.at, kind:'live'};
+  return {values:INV, at:INV_AT, kind:'inv'};
+}
+function stockCompute(){
+  const base=stockBase();
+  const cur={}, done={}, plan={};
+  ALL_PORTS.forEach(p=>{cur[p.no]=base.values[p.no]??0;done[p.no]=0;plan[p.no]=0;});
+  const doneKeys=new Set();
+  stockEvents().forEach(e=>{
+    if(e.st==='done'){
+      if(e.at>base.at){cur[e.no]+=e.d;done[e.no]+=e.d;doneKeys.add(e.key);}
+    }else if(e.st!=='skip'){ plan[e.no]+=e.d; }
+  });
+  return {base,cur,done,plan,nDone:doneKeys.size};
+}
+function stockStatus(p,n){
+  if(p.exclude||p.carBase) return {c:'#7f8c8d',t:'対象外'};
+  if(n<=0) return {c:'#c0392b',t:'ゼロ'};
+  if(n<(p.target||0)) return {c:'#e67e22',t:'不足'};
+  if(n>(p.upper||0)) return {c:'#1f6fb2',t:'過多'};
+  return {c:'#1e8449',t:'適正'};
+}
+function stockLegend(m){
+  const lg=L.control({position:'bottomleft'});
+  lg.onAdd=function(){
+    const d=L.DomUtil.create('div');
+    const dot=c=>`<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${c};vertical-align:-2px;margin-right:4px"></span>`;
+    d.style.cssText='background:rgba(255,255,255,.92);color:#222;padding:6px 10px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.3);font-size:12px;line-height:1.9;font-weight:600';
+    d.innerHTML=`${dot('#c0392b')}ゼロ　${dot('#e67e22')}目標未満　${dot('#1e8449')}適正<br>${dot('#1f6fb2')}上限超え　${dot('#7f8c8d')}対象外<br><span style="display:inline-block;width:12px;height:12px;border-radius:50%;outline:3px solid #f1c40f;vertical-align:-2px;margin-right:6px"></span>完了で変化　<span style="border:1px solid #bbb;border-radius:8px;font-size:10px;padding:0 4px">→4</span> 計画後<br><span style="display:inline-block;background:#555;color:#fff;border-radius:8px;font-size:10px;padding:0 5px;margin-right:4px">計7</span>合算グループ（タップで内訳）`;
+    return d;
+  };
+  lg.addTo(m);
+}
+function renderStockMap(fit){
+  const el=document.getElementById('stock-map'); if(!el) return;
+  if(typeof L==='undefined'){el.innerHTML='<div class="empty-msg">地図ライブラリを読み込めません（ネット接続を確認）</div>';return;}
+  if(!stockMap){
+    el.innerHTML='';
+    stockMap=L.map('stock-map').setView([34.340,134.047],14);
+    addBaseLayer(stockMap); stockLegend(stockMap);
+  }
+  stockMap.invalidateSize();
+  stockMarkers.forEach(m=>stockMap.removeLayer(m)); stockMarkers=[];
+  const {base,cur,done,plan,nDone}=stockCompute();
+  const showNames=document.getElementById('sm-names')?.checked;
+  let tot=0,nz=0,ns=0,no=0;
+  const pts=[];
+  const merge=document.getElementById('sm-group')?.checked!==false;
+  ALL_PORTS.forEach(p=>tot+=cur[p.no]);
+  if(merge){
+    PORT_GROUPS.forEach(g=>{
+      const ms=g.nos.map(n=>PM[n]).filter(Boolean); if(!ms.length)return;
+      const sum=ms.reduce((a,q)=>a+cur[q.no],0);
+      const agg={target:ms.reduce((a,q)=>a+(q.target||0),0),upper:ms.reduce((a,q)=>a+(q.upper||0),0),lower:ms.reduce((a,q)=>a+(q.lower||0),0)};
+      const st=stockStatus(agg,sum);
+      if(st.t==='ゼロ')nz++; else if(st.t==='不足')ns++; else if(st.t==='過多')no++;
+      const pl=ms.reduce((a,q)=>a+plan[q.no],0), chg=ms.some(q=>done[q.no]);
+      const lat=ms.reduce((a,q)=>a+q.lat,0)/ms.length, lng=ms.reduce((a,q)=>a+q.lng,0)/ms.length;
+      const w=46,h=34;
+      const planTag=pl?`<span class="sm-plan">→${sum+pl}</span>`:'';
+      const html=`<div class="sm-pin${chg?' chg':''}" style="background:${st.c};width:${w}px;height:${h}px;border-radius:17px;border-width:3px;border-style:double"><span style="font-size:10px;margin-right:2px">計</span>${sum}${planTag}</div>`;
+      const icon=L.divIcon({html,className:'custom-div-icon',iconSize:[w,h],iconAnchor:[w/2,h/2]});
+      const m=L.marker([lat,lng],{icon,zIndexOffset:500}).addTo(stockMap);
+      if(showNames) m.bindTooltip(`🔗${g.name}`,{permanent:true,direction:'right',offset:[w/2+2,0],className:'port-label'});
+      const rows=ms.map(q=>`<tr><td>${q.no}.${q.name}</td><td style="text-align:right"><b>${cur[q.no]}</b>台${plan[q.no]?`（→${cur[q.no]+plan[q.no]}）`:''}</td><td><button onclick="stockAdjust('${q.no}',-1)">－</button><button onclick="stockAdjust('${q.no}',1)">＋</button></td></tr>`).join('');
+      m.bindPopup(`<div class="sm-pop"><b>🔗 ${g.name}</b><br>
+        合計 <b style="color:${st.c}">${sum}台</b>（${st.t}）<br>
+        下限計${agg.lower}・目標計${agg.target}・上限計${agg.upper}<br>
+        ${pl?`未完了の計画 ${pl>0?'+':''}${pl} → 計画後 ${sum+pl}台<br>`:''}
+        <table style="margin-top:4px;font-size:12px">${rows}</table>
+        <div style="font-size:11px;color:#888">移動元・移動先の判定はこの合計で行います</div></div>`);
+      stockMarkers.push(m); pts.push([lat,lng]);
+    });
+  }
+  ALL_PORTS.forEach(p=>{
+    if(!Number.isFinite(p.lat)||!Number.isFinite(p.lng)) return;
+    if(merge&&GROUP_OF[p.no]) return;
+    const n=cur[p.no], st=stockStatus(p,n);
+    if(st.t==='ゼロ')nz++; else if(st.t==='不足')ns++; else if(st.t==='過多')no++;
+    const sz=n>=10?34:30;
+    const planTag=plan[p.no]?`<span class="sm-plan">→${n+plan[p.no]}</span>`:'';
+    const html=`<div class="sm-pin${done[p.no]?' chg':''}" style="background:${st.c};width:${sz}px;height:${sz}px">${n}${planTag}</div>`;
+    const icon=L.divIcon({html,className:'custom-div-icon',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]});
+    const m=L.marker([p.lat,p.lng],{icon}).addTo(stockMap);
+    if(showNames) m.bindTooltip(`${p.no} ${p.name}`,{permanent:true,direction:'right',offset:[sz/2+2,0],className:'port-label'});
+    const capTxt=p.capacity!=null?`・収容${p.capacity}`:'';
+    m.bindPopup(`<div class="sm-pop"><b>${p.no}.${p.name}</b><br>
+      現在 <b style="color:${st.c}">${n}台</b>（${st.t}）<br>
+      下限${p.lower||0}・目標${p.target||0}・上限${p.upper||0}${capTxt}<br>
+      ${done[p.no]?`完了ぶん ${done[p.no]>0?'+':''}${done[p.no]}台（基準 ${n-done[p.no]}台）<br>`:''}
+      ${plan[p.no]?`未完了の計画 ${plan[p.no]>0?'+':''}${plan[p.no]} → 計画後 ${n+plan[p.no]}台<br>`:''}
+      <div class="sm-adj"><button onclick="stockAdjust('${p.no}',-1)">－1</button><button onclick="stockAdjust('${p.no}',1)">＋1</button><span style="font-size:11px;color:#888;align-self:center">計画外の移動を手で反映</span></div></div>`);
+    stockMarkers.push(m); pts.push([p.lat,p.lng]);
+  });
+  document.getElementById('sm-total').textContent=`合計 ${tot}台`;
+  document.getElementById('sm-zero').textContent=`ゼロ ${nz}`;
+  document.getElementById('sm-short').textContent=`不足 ${ns}`;
+  document.getElementById('sm-over').textContent=`過多 ${no}`;
+  const fmt=t=>t?new Date(t).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+  let src=base.kind==='live'
+    ? `基準：このタブで取得した最新データ（データ時刻 ${fmt(stockLive.dataAt)}）`
+    : `基準：在庫データ（計画の元。更新 ${fmt(INV_AT)}）`;
+  src+=`／その後に完了・手修正した ${nDone}件を反映`;
+  if(base.kind==='live'&&stockLive.notListed?.length) src+=`／公開データ未掲載で据え置き：${stockLive.notListed.join('、')}`;
+  const hasPlan=flatSteps.length||(typeof carFlatSteps!=='undefined'&&carFlatSteps.length);
+  if(hasPlan) src+='<br>計画が残っているポートは「→計画後の台数」を表示しています。';
+  document.getElementById('sm-src').innerHTML=src;
+  // 変化したポート一覧
+  const rows=ALL_PORTS.filter(p=>done[p.no]).map(p=>{
+    const st=stockStatus(p,cur[p.no]);
+    return `<tr><td>${p.no}.${p.name}</td><td>${cur[p.no]-done[p.no]} → <b style="color:${st.c}">${cur[p.no]}</b></td><td>${done[p.no]>0?'+':''}${done[p.no]}</td><td>${st.t}</td></tr>`;
+  });
+  document.getElementById('sm-list').innerHTML=rows.length
+    ?`<table><tr><th>ポート</th><th>台数</th><th>増減</th><th>状態</th></tr>${rows.join('')}</table>`
+    :'<div class="empty-msg" style="padding:10px 0">まだありません（現場モードで「✓ 完了」を押すとここに反映されます）</div>';
+  if((fit||!stockFitted)&&pts.length){
+    // 遠方のポート（対象外など）で縮尺が引かれすぎないよう、市中心部から5km以内で合わせる
+    const near=pts.filter(q=>gd({lat:q[0],lng:q[1]},{lat:34.340,lng:134.047})<5000);
+    const bounds=L.latLngBounds(near.length?near:pts);
+    // タブ切替直後は地図の大きさが確定していないので、少し待ってから合わせる
+    setTimeout(()=>{ if(!stockMap)return; stockMap.invalidateSize(); try{stockMap.fitBounds(bounds,{padding:[20,20]});stockFitted=true;}catch(e){} },150);
+  }
+}
+function stockAdjust(no,d){
+  stockManual.push({no,d,at:Date.now()});
+  renderStockMap(false);
+}
+async function stockFetchLive(){
+  if(stockLiveBusy) return;
+  const btn=document.getElementById('sm-live-btn');
+  stockLiveBusy=true; btn.disabled=true; btn.textContent='取得中…';
+  const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),20000);
+  try{
+    const get=async name=>{
+      const r=await fetch(LIVE_GBFS_BASE+name+'.json',{signal:controller.signal,cache:'no-store',credentials:'omit'});
+      if(!r.ok) throw new Error(`公開データへの接続エラー（${r.status}）`);
+      return r.json();
+    };
+    const [info,status]=await Promise.all([get('station_information'),get('station_status')]);
+    const result=buildLiveInventory(info,status,ALL_PORTS);
+    stockLive={values:result.values, at:Date.now(), dataAt:result.updated*1000,
+      notListed:result.notListed||[], unavailable:result.unavailable||[]};
+    renderStockMap(false);
+  }catch(error){
+    alert(`取得できませんでした。${error.name==='AbortError'?'通信がタイムアウトしました':error.message}`);
+  }finally{
+    clearTimeout(timer); controller.abort(); stockLiveBusy=false;
+    btn.disabled=false; btn.textContent='🌐 最新台数を取得（計画はそのまま）';
+  }
+}
+// 表示中の台数を在庫に確定（＝次の計画の出発点にする）。計画は元の在庫が前提なので消える。
+function stockCommitToInv(){
+  const {cur}=stockCompute();
+  const hasPlan=flatSteps.length||(typeof carFlatSteps!=='undefined'&&carFlatSteps.length);
+  const pending=stockEvents().filter(e=>e.src!=='manual'&&e.st!=='done'&&e.st!=='skip').length;
+  let msg='地図の台数を在庫に反映します。';
+  if(hasPlan) msg+= pending
+    ? '\n\n⚠ まだ完了していない移動があります。反映すると今の移動計画は消えます（未完了ぶんは在庫に入りません）。よろしいですか？'
+    : '\n\n今の移動計画はすべて完了扱いなので、計画を片付けて次の計画を立てられる状態にします。';
+  if(!confirm(msg)) return;
+  const next={}; ALL_PORTS.forEach(p=>next[p.no]=Math.max(0,cur[p.no]));
+  clearInventoryPlans();
+  INV=next; inventoryRevision++; lsSave(LS_INV,INV);
+  lsDel('shsac6_live_meta');
+  const ls=document.getElementById('live-inv-status'); if(ls) ls.textContent='台数マップから反映した在庫を使用中';
+  const ps=document.getElementById('paste-status'); if(ps) ps.textContent=`台数マップ ${new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}`;
+  stockManual=[]; stepDoneAt={}; carStepDoneAt={};
+  initCommute();renderSrc();renderDst();updateBar();
+  renderStockMap(false);
+}
+
 </script>
 
 </body></html>
