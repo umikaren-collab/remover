@@ -822,7 +822,7 @@ const ALL_PORTS=[
   {no:"047",name:"セントラル田町ビル No.1",rank:"B",lower:1,target:1,upper:2,nat:0.283,lat:34.33724,lng:134.048873,out:0.641,back:0.359,capacity:2},
   {no:"048",name:"セントラル田町ビル No.2",rank:"C",lower:1,target:2,upper:3,nat:0.304,lat:34.337045,lng:134.049171,out:0.489,back:0.261,capacity:3},
   // 2026年10月新設。設定値は仮（設定タブで調整）。公開データに未掲載の間は自動取得で照合できなくてもエラーにしない
-  {no:"049",name:"高松予備校",rank:"C",lower:0,target:1,upper:2,nat:0,lat:34.334282,lng:134.063568,capacity:null,liveOptional:true}
+  {no:"049",name:"高松予備校",rank:"C",lower:0,target:1,upper:2,nat:0,lat:34.334688,lng:134.063803,capacity:null,liveOptional:true}
 ];
 const PM={};ALL_PORTS.forEach(p=>PM[p.no]=p);
 // 実績データの更新（2026年7〜9月の3か月平均）。保存済みのポート設定がある場合も、
@@ -2190,49 +2190,66 @@ const LIVE_GBFS_BASE='https://api-public.odpt.org/api/v4/gbfs/docomo-cycle/';
 const LIVE_MAX_AGE=10*60;
 let liveInvBusy=false,inventoryRevision=0;
 function liveDataTime(value){
-  return typeof value==='number' && Number.isFinite(value) ? value : NaN;
+  // 数値のほか、数字の文字列やISO形式の日時で返ってくる場合も受け付ける
+  if(typeof value==='number'&&Number.isFinite(value))return value;
+  if(typeof value==='string'&&value.trim()){
+    const n=Number(value);if(Number.isFinite(n))return n;
+    const t=Date.parse(value);if(Number.isFinite(t))return t/1000;
+  }
+  return NaN;
 }
+const LIVE_STALE_OK=60*60;   // 個別ポートの報告がこれより古ければ使わない（据え置き）
+const LIVE_MAX_KEEP=5;       // 据え置きがこれを超えたら公開データ側の障害とみなして取得を中止
 function buildLiveInventory(info,status,ports,now=Date.now()/1000){
   if(!Array.isArray(info?.data?.stations)||!Array.isArray(status?.data?.stations))
     throw new Error('公開データの形式を確認できません');
   const updated=liveDataTime(status.last_updated);
   if(!Number.isFinite(updated)||now-updated>LIVE_MAX_AGE||updated-now>120)
     throw new Error('公開データの更新時刻が古いか不正です');
+  // 同じステーションの状態が重複して載ることがあるので、報告時刻が新しいほうを使う
   const statuses=new Map();
   for(const s of status.data.stations){
     const id=String(s.station_id);
-    statuses.set(id,statuses.has(id)?null:s);
+    const prev=statuses.get(id);
+    if(!prev||(liveDataTime(s.last_reported)||0)>(liveDataTime(prev.last_reported)||0))statuses.set(id,s);
   }
-  const values={},missing=[],unavailable=[],notListed=[];
+  const values={},unavailable=[],notListed=[],stale=[],kept=[];
   const used=new Set();
   let oldest=updated;
+  const keep=(p,why)=>{values[p.no]=(typeof INV!=='undefined'&&INV[p.no])||0;kept.push(`${p.no}（${why}）`);};
   for(const p of ports){
     const matches=info.data.stations.filter(s=>{
       const no=String(s.name||'').normalize('NFKC').match(/^(\d{3})[.．\s]/)?.[1];
-      return no===p.no && Number.isFinite(s.lat)&&Number.isFinite(s.lon)
-        && gd(p,{lat:s.lat,lng:s.lon})<300;
+      return no===p.no && Number.isFinite(+s.lat)&&Number.isFinite(+s.lon)
+        && gd(p,{lat:+s.lat,lng:+s.lon})<300;
     });
-    const station=matches.length===1?matches[0]:null;
-    const id=station?String(station.station_id):'';
-    const s=station && !used.has(id)?statuses.get(id):null;
-    const reported=liveDataTime(s?.last_reported);
-    if(!s||!Number.isInteger(s.num_bikes_available)||s.num_bikes_available<0
-      ||!Number.isFinite(reported)||now-reported>LIVE_MAX_AGE||reported-now>120
-      ||![true,false,0,1].includes(s.is_installed)||![true,false,0,1].includes(s.is_renting)){
-      // 新設ポートなど公開データに未掲載のものは、今の台数を据え置いて続行
-      if(p.liveOptional && !station){ values[p.no]=(typeof INV!=='undefined'&&INV[p.no])||0; notListed.push(p.no); continue; }
-      missing.push(p.no);continue;
+    if(!matches.length){
+      if(p.liveOptional||p.exclude){values[p.no]=(typeof INV!=='undefined'&&INV[p.no])||0;notListed.push(p.no);continue;}
+      keep(p,'公開データの一覧に無い');continue;
     }
+    // 同じ番号が近くに複数ある場合は、いちばん近いものを使う
+    const station=matches.sort((x,y)=>gd(p,{lat:+x.lat,lng:+x.lon})-gd(p,{lat:+y.lat,lng:+y.lon}))[0];
+    const id=String(station.station_id);
+    const s=!used.has(id)?statuses.get(id):null;
+    if(!s){keep(p,'状態データが無い');continue;}
+    const bikes=Number(s.num_bikes_available);
+    if(!Number.isInteger(bikes)||bikes<0){keep(p,`台数が不正(${s.num_bikes_available})`);continue;}
+    const reported=liveDataTime(s.last_reported);
+    if(!Number.isFinite(reported)||reported-now>120){keep(p,'報告時刻が不正');continue;}
+    const age=now-reported;
+    if(age>LIVE_STALE_OK){keep(p,`報告が${Math.round(age/60)}分前で古い`);continue;}
+    if(age>LIVE_MAX_AGE)stale.push(`${p.no}（${Math.round(age/60)}分前）`);
+    else oldest=Math.min(oldest,reported);
     used.add(id);
-    oldest=Math.min(oldest,reported);
-    const rentable=!!s.is_installed&&!!s.is_renting;
-    values[p.no]=rentable?s.num_bikes_available:0;
+    const flag=v=>v===true||v===1||v==='1'||v==='true'||v===undefined;   // 項目が無いときは稼働中とみなす
+    const rentable=flag(s.is_installed)&&flag(s.is_renting);
+    values[p.no]=rentable?bikes:0;
     if(!rentable)unavailable.push(p.no);
   }
-  // Do not mix old/unknown counts into a supposedly current plan.
-  if(missing.length)throw new Error(`照合・鮮度を確認できないポート：${missing.join('、')}`);
+  if(kept.length>LIVE_MAX_KEEP)
+    throw new Error(`照合できないポートが多すぎます：${kept.join('、')}`);
   if(!Object.keys(values).length)throw new Error('対象ポートがありません');
-  return {values,updated:oldest,unavailable,notListed};
+  return {values,updated:oldest,unavailable,notListed,stale,kept};
 }
 function livePlanSignature(){
   return JSON.stringify([inventoryRevision,INV,currentMode,[...selVeh],[...selDst],currentOptRoute,
@@ -2293,7 +2310,9 @@ async function updateLiveInventory(){
     const at=new Date(result.updated*1000).toLocaleString('ja-JP');
     const label=`✓ ${Object.keys(INV).length}ポート更新（貸出可能台数）／データ時刻 ${at}`
       +(result.unavailable.length?`／貸出停止中は0台：${result.unavailable.join('、')}`:'')
-      +(result.notListed&&result.notListed.length?`／公開データ未掲載のため台数据え置き：${result.notListed.join('、')}`:'');
+      +(result.notListed&&result.notListed.length?`／公開データ未掲載のため台数据え置き：${result.notListed.join('、')}`:'')
+      +(result.stale&&result.stale.length?`／⚠報告が少し古い：${result.stale.join('、')}`:'')
+      +(result.kept&&result.kept.length?`／⚠取得できず前の台数のまま：${result.kept.join('、')}`:'');
     lsSave('shsac6_live_meta',label);
     message.textContent=label;
     document.getElementById('inv-msg').textContent='公開データを反映しました。';
@@ -3850,6 +3869,8 @@ function renderStockMap(fit){
     : `基準：在庫データ（計画の元。更新 ${fmt(INV_AT)}）`;
   src+=`／その後に完了・手修正した ${nDone}件を反映`;
   if(base.kind==='live'&&stockLive.notListed?.length) src+=`／公開データ未掲載で据え置き：${stockLive.notListed.join('、')}`;
+  if(base.kind==='live'&&stockLive.stale?.length) src+=`<br>⚠ 報告が少し古い：${stockLive.stale.join('、')}`;
+  if(base.kind==='live'&&stockLive.kept?.length) src+=`<br>⚠ 取得できず前の台数のまま：${stockLive.kept.join('、')}`;
   const hasPlan=flatSteps.length||(typeof carFlatSteps!=='undefined'&&carFlatSteps.length);
   if(hasPlan) src+='<br>計画が残っているポートは「→計画後の台数」を表示しています。';
   document.getElementById('sm-src').innerHTML=src;
@@ -3887,7 +3908,7 @@ async function stockFetchLive(){
     const [info,status]=await Promise.all([get('station_information'),get('station_status')]);
     const result=buildLiveInventory(info,status,ALL_PORTS);
     stockLive={values:result.values, at:Date.now(), dataAt:result.updated*1000,
-      notListed:result.notListed||[], unavailable:result.unavailable||[]};
+      notListed:result.notListed||[], unavailable:result.unavailable||[], stale:result.stale||[], kept:result.kept||[]};
     renderStockMap(false);
   }catch(error){
     alert(`取得できませんでした。${error.name==='AbortError'?'通信がタイムアウトしました':error.message}`);
