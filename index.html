@@ -1547,9 +1547,44 @@ function buildPairsOptimized(){
   const{route:optRoute,totalTime:optTime}=jointOptimize(initMoves,startPort);
 
   lastOptInfo.assign=Math.round((baselineTime-optTime)*10)/10;
+  manualPairInfo=null;
 
+  // ── ③手動の組み替え：ユーザーが行き先を入れ替えた場合は、その組み合わせを固定し順序だけ最適化 ──
+  const sig=pairSelectionSig(veh,dst);
+  if(manualAssign&&manualAssign.sig===sig){
+    const want=[...dst].sort().join(','), got=veh.map(v=>manualAssign.map[v.vid]).sort().join(',');
+    if(want===got){
+      const mv=veh.map(v=>{const to=manualAssign.map[v.vid];return{vid:v.vid,from:v.from,to,dist:Math.round(gd(PM[v.from],PM[to]))};});
+      const cost=r=>calcRouteTimeFrom(r,startPort);
+      const route=twoOptGeneric(nn(mv,startPort),cost,50);
+      let pos=startPort;route.forEach(m=>{m.wd=Math.round(gd(pos,PM[m.from]));pos=PM[m.to];});
+      const mt=cost(route);
+      lastOptInfo.assign=0;
+      manualPairInfo={manualTime:mt,autoTime:optTime,diff:Math.round((mt-optTime)*10)/10};
+      return[...route.map(m=>({vid:m.vid,from:m.from,to:m.to,dist:m.dist})),...extra];
+    }
+  }
+  if(manualAssign&&manualAssign.sig!==sig)manualAssign=null;   // 選択が変わったら手動の組み替えは解除
   return[...optRoute.map(m=>({vid:m.vid,from:m.from,to:m.to,dist:m.dist})),...extra];
 }
+// ── 手動の組み替え ──
+let manualAssign=null, manualPairInfo=null;
+function pairSelectionSig(veh,dst){return veh.map(v=>v.vid).sort().join(',')+'|'+[...dst].sort().join(',');}
+function setPairDest(vid,newTo){
+  const pairs=buildPairsOptimized().filter(m=>m.to);
+  const me=pairs.find(m=>m.vid===vid); if(!me||me.to===newTo)return;
+  const other=pairs.find(m=>m.vid!==vid&&m.to===newTo);
+  const map={}; pairs.forEach(m=>map[m.vid]=m.to);
+  if(other) map[other.vid]=me.to;   // 行き先を入れ替える
+  map[vid]=newTo;
+  const vehicles=[],slots=[];
+  selVeh.forEach(v=>{const[no,ki]=v.split('-');if(parseInt(ki)<srcSlotCount(no))vehicles.push({vid:v,from:no});});
+  selDst.forEach(d=>{const[no,ki]=d.split('-');if(PM[no]&&parseInt(ki)<dstSlotCount(no))slots.push(no);});
+  const n=Math.min(vehicles.length,slots.length);
+  manualAssign={sig:pairSelectionSig(vehicles.slice(0,n),slots.slice(0,n)),map};
+  updateBar();
+}
+function resetPairs(){manualAssign=null;updateBar();}
 
 function calcRouteTimeFrom(route,startPort){
   let t=0,pos=startPort;
@@ -1842,9 +1877,24 @@ function updateBar(){
 function renderPairs(pairs){
   const pw=document.getElementById('pairs-wrap');
   const paired=pairs.filter(m=>m.to);if(!paired.length){pw.innerHTML='';return;}
-  let h=`<div class="card"><div class="card-body"><div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:8px">自動ペアリング（最適化済み・${paired.length}組）</div>`;
+  const mi=manualPairInfo;
+  let h=`<div class="card"><div class="card-body"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">`;
+  if(mi){
+    const col=mi.diff>0.5?'var(--orange)':'var(--green)';
+    h+=`<span style="font-size:13px;font-weight:700;color:var(--purple)">✋ 手動で組み替え中（${paired.length}組）</span>
+      <span style="font-size:12px;font-weight:700;color:${col}">自動の組み合わせより ${mi.diff>0?'+':''}${mi.diff}分（直線での概算）</span>
+      <button class="btn" onclick="resetPairs()" style="min-height:32px;padding:4px 10px;font-size:12px;margin-left:auto">自動に戻す</button>`;
+  }else{
+    h+=`<span style="font-size:13px;font-weight:700;color:var(--text2)">自動ペアリング（最適化済み・${paired.length}組）</span>
+      <span style="font-size:11px;color:var(--text3)">行き先は ▼ で入れ替えられます</span>`;
+  }
+  h+=`</div>`;
+  if(mi&&lastRouteData)h+=`<div style="font-size:12px;color:var(--purple);margin-bottom:6px">組み替えた内容は「ルート計算」を押すと地図・手順に反映されます</div>`;
+  const dstPorts=[...new Set(paired.map(m=>m.to))];
   pairs.forEach((p,i)=>{h+=`<div class="pair-row"><span style="font-size:12px;color:var(--text4);min-width:18px;font-weight:600">${i+1}</span>`;
-    if(p.to){const t=PM[p.to];h+=`<span style="color:var(--blue);font-weight:700">[${p.from}] ${PM[p.from].name}</span><span style="color:var(--text4);font-size:13px;margin:0 4px">→</span><span style="color:var(--red);font-weight:700">[${p.to}] ${t.name}</span><span style="font-size:12px;color:var(--text3);font-weight:600;margin-left:auto">${p.dist.toLocaleString()}m</span>`;}
+    if(p.to){
+      const opts=dstPorts.filter(d=>!sameGroup(p.from,d)).map(d=>`<option value="${d}"${d===p.to?' selected':''}>[${d}] ${PM[d].name}</option>`).join('');
+      h+=`<span style="color:var(--blue);font-weight:700">[${p.from}] ${PM[p.from].name}</span><span style="color:var(--text4);font-size:13px;margin:0 4px">→</span><select onchange="setPairDest('${p.vid}',this.value)" style="font-family:inherit;font-size:14px;font-weight:700;color:var(--red);border:1px solid var(--border);border-radius:6px;padding:2px 4px;background:#fff;width:auto;max-width:55%;min-height:0;height:32px">${opts}</select><span style="font-size:12px;color:var(--text3);font-weight:600;margin-left:auto">${p.dist.toLocaleString()}m</span>`;}
     else h+=`<span style="color:var(--blue);font-weight:700">[${p.from}] ${PM[p.from].name}</span><span style="font-size:12px;color:var(--orange);font-weight:600;margin-left:auto">移動先未割当</span>`;
     h+='</div>';});
   pw.innerHTML=h+'</div></div>';
