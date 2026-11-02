@@ -839,11 +839,33 @@ const RR={S:4,A:3,B:2,C:1,D:0};
 // ── 合算グループ ──
 // 隣接していて利用者がどちらにも返す・借りるポートは、1か所として台数を考える。
 // 移動元／移動先の判定（手動・自動とも）はグループ合計で行い、グループ内どうしの移動は作らない。
-const PORT_GROUPS=[
-  {id:'station', name:'高松駅（青鬼くん・バスタ）', nos:['032','033']},
-  {id:'ntt',     name:'NTT西（香川大学前）',       nos:['026','027','028']},
-  {id:'tamachi', name:'セントラル田町',             nos:['047','048']}
+// 半径GROUP_RADIUS m以内のポートは自動で同じグループにする（つながりでたどるので A–B–C も1グループ）。
+// 名前を付けたいグループは PORT_GROUP_NAMES に書く（メンバーが1つでも重なれば、その名前を使う）。
+const GROUP_RADIUS=50;
+const PORT_GROUP_NAMES=[
+  {id:'station',  name:'高松駅（青鬼くん・バスタ）', nos:['032','033']},
+  {id:'ntt',      name:'NTT西（香川大学前）',       nos:['026','027','028']},
+  {id:'tamachi',  name:'セントラル田町',             nos:['047','048']},
+  {id:'hachihon', name:'八本松（テック八本松・No.1の街）', nos:['004','041']},
+  {id:'granlab',  name:'GRANLAB丸の内',              nos:['025','042']}
 ];
+function buildPortGroups(){
+  const ps=ALL_PORTS.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)&&!p.exclude&&!p.carBase);
+  const parent={};ps.forEach(p=>parent[p.no]=p.no);
+  const find=x=>parent[x]===x?x:(parent[x]=find(parent[x]));
+  for(let i=0;i<ps.length;i++)for(let j=i+1;j<ps.length;j++){
+    const R=6371000,a=ps[i],b=ps[j],dl=(b.lat-a.lat)*Math.PI/180,dn=(b.lng-a.lng)*Math.PI/180,
+      x=Math.sin(dl/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dn/2)**2;
+    if(R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))<=GROUP_RADIUS+0.5)parent[find(a.no)]=find(b.no);
+  }
+  const comp={};ps.forEach(p=>{const r=find(p.no);(comp[r]=comp[r]||[]).push(p.no);});
+  return Object.values(comp).filter(c=>c.length>1).map(c=>{
+    c.sort();
+    const named=PORT_GROUP_NAMES.find(g=>g.nos.some(n=>c.includes(n)));
+    return named?{id:named.id,name:named.name,nos:c}:{id:'g'+c.join('_'),name:c.map(n=>PM[n].name).join('・'),nos:c};
+  });
+}
+const PORT_GROUPS=buildPortGroups();
 const GROUP_OF={};PORT_GROUPS.forEach(g=>g.nos.forEach(no=>GROUP_OF[no]=g));
 function sameGroup(a,b){const g=GROUP_OF[a];return !!g&&g===GROUP_OF[b];}
 function groupKey(no){const g=GROUP_OF[no];return g?'G:'+g.id:no;}
