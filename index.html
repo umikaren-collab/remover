@@ -228,6 +228,8 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
 .fq-lab{font-size:12px;font-weight:700;color:#bbb}
 .fq-btn{font-family:inherit;font-size:13px;font-weight:700;padding:6px 10px;min-height:40px;border-radius:var(--r8);border:1.5px solid #5dade2;background:#1a5276;color:#fff;cursor:pointer}
 .fq-btn:disabled{opacity:.5;cursor:default}
+.crew-btn{background:#333;border-color:#666}
+.crew-btn.on{background:#e67e22;border-color:#f5b041}
 
 /* マップ上のポート名ラベル */
 .leaflet-tooltip.port-label{
@@ -348,7 +350,7 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
   <span class="chip chip-gray" id="t-dst">移動先 0台</span>
   <span class="chip chip-gray" id="t-pair">ペア 0組</span>
   <span class="chip chip-gray" id="t-time">推定 0分</span>
-  <div class="ml"><button class="btn btn-p" id="calc-btn" onclick="doRoute()" style="padding:8px 16px;min-height:40px;font-size:14px">ルート計算 ↗</button><span class="fq-wrap"><span class="fq-lab">計算して現場へ</span><button class="fq-btn" onclick="doRouteField(3)">3件</button><button class="fq-btn" onclick="doRouteField(5)">5件</button><button class="fq-btn" onclick="doRouteField(8)">8件</button><button class="fq-btn" onclick="doRouteField('all')">全部</button></span><button class="btn" onclick="doPrint('plan')" style="padding:8px 14px;min-height:40px;font-size:14px;margin-left:6px">🖨 印刷</button></div>
+  <div class="ml"><span class="fq-wrap" style="margin:0 8px 0 0"><span class="fq-lab">人数</span><button class="fq-btn crew-btn" data-n="1" onclick="setCrew(1)">1人</button><button class="fq-btn crew-btn" data-n="2" onclick="setCrew(2)">2人</button><button class="fq-btn crew-btn" data-n="3" onclick="setCrew(3)">3人</button></span><button class="btn btn-p" id="calc-btn" onclick="doRoute()" style="padding:8px 16px;min-height:40px;font-size:14px">ルート計算 ↗</button><span class="fq-wrap"><span class="fq-lab">計算して現場へ</span><button class="fq-btn" onclick="doRouteField(3)">3件</button><button class="fq-btn" onclick="doRouteField(5)">5件</button><button class="fq-btn" onclick="doRouteField(8)">8件</button><button class="fq-btn" onclick="doRouteField('all')">全部</button></span><button class="btn" onclick="doPrint('plan')" style="padding:8px 14px;min-height:40px;font-size:14px;margin-left:6px">🖨 印刷</button></div>
 </div>
 
 <div id="mode-plan" style="display: none;">
@@ -1608,6 +1610,45 @@ function setPairDest(vid,newTo){
 }
 function resetPairs(){manualAssign=null;updateBar();}
 
+// ── 人数モード：2〜3人が一緒に自転車で動き、1回で人数分の台数をまとめて運ぶ ──
+// 歩きも全員一緒なので、1便＝1人で1台運ぶときと同じ時間で、最大◯台動かせる。
+let crewSize=(()=>{try{const v=JSON.parse(localStorage.getItem('shsac6_crew'));return [1,2,3].includes(v)?v:1;}catch(e){return 1;}})();
+function setCrew(n){
+  crewSize=n;try{localStorage.setItem('shsac6_crew',JSON.stringify(n));}catch(e){}
+  renderCrewButtons();updateBar();
+}
+function renderCrewButtons(){document.querySelectorAll('.crew-btn').forEach(b=>b.classList.toggle('on',+b.dataset.n===crewSize));}
+function buildPlanMoves(){
+  if(crewSize<=1)return buildPairsOptimized();
+  manualPairInfo=null;lastOptInfo.assign=0;
+  const sup={},dem={};
+  selVeh.forEach(v=>{const[no,ki]=v.split('-');if(parseInt(ki)<srcSlotCount(no))sup[no]=(sup[no]||0)+1;});
+  selDst.forEach(d=>{const[no,ki]=d.split('-');if(PM[no]&&parseInt(ki)<dstSlotCount(no))dem[no]=(dem[no]||0)+1;});
+  const startPort=commuteGo?PM[commuteGo]:START;
+  const batches=[];let pos=startPort,bi=0;
+  for(let guard=0;guard<200;guard++){
+    let best=null,bs=Infinity;
+    Object.keys(sup).forEach(f=>{if(sup[f]<=0)return;
+      Object.keys(dem).forEach(t=>{if(dem[t]<=0||f===t||sameGroup(f,t))return;
+        const k=Math.min(crewSize,sup[f],dem[t]);
+        const wd=gd(pos,PM[f]),rd=gd(PM[f],PM[t]);
+        const tm=travelMin(wd,WALK_SPD)+travelMin(rd,BIKE_SPD)+BOARD+ALIGHT;
+        const sc=tm/k;   // 1台あたりの時間が一番短い便を選ぶ
+        if(sc<bs){bs=sc;best={from:f,to:t,n:k,dist:Math.round(rd)};}
+      });});
+    if(!best)break;
+    sup[best.from]-=best.n;dem[best.to]-=best.n;
+    batches.push({vid:'B'+(bi++),...best});pos=PM[best.to];
+  }
+  if(!batches.length)return[];
+  const cost=r=>calcRouteTimeFrom(r,startPort);
+  const route=twoOptGeneric(batches,cost,50);
+  let p=startPort;route.forEach(m=>{m.wd=Math.round(gd(p,PM[m.from]));p=PM[m.to];});
+  return route;
+}
+// 車タブなど1台単位で扱う処理向け：便を台数分に展開
+function expandMoves(ms){return ms.flatMap(m=>Array.from({length:m.n||1},()=>({...m,n:1})));}
+
 function calcRouteTimeFrom(route,startPort){
   let t=0,pos=startPort;
   route.forEach(m=>{
@@ -1744,7 +1785,7 @@ function buildFlatStepsCore(route,opts={}){
     const fallbackRd = m.dist||Math.round(gd(f,td));
     const rd = getRealDist('bike',fallbackRd);
     const mv=rd/1000/BIKE_SPD*60,sg=sigMin(rd);
-    const rs={id:sid++,kind:'ride',from:m.from+'.'+f.name,to:m.to+'.'+td.name,dist:rd,movMin:mv,sigMin2:sg,boardMin:BOARD+ALIGHT,total:mv+sg+BOARD+ALIGHT,dep:cur,arr:cur+mv+sg+BOARD+ALIGHT,isZero:(INV[m.to]??0)===0,isRet:commuteRet===m.to,moveKey:`${m.from}→${m.to}`};
+    const rs={id:sid++,kind:'ride',from:m.from+'.'+f.name,to:m.to+'.'+td.name,dist:rd,movMin:mv,sigMin2:sg,boardMin:BOARD+ALIGHT,total:mv+sg+BOARD+ALIGHT,dep:cur,arr:cur+mv+sg+BOARD+ALIGHT,isZero:(INV[m.to]??0)===0,isRet:commuteRet===m.to,moveKey:`${m.from}→${m.to}`,n:m.n||1};
     if(includeCommute)rs.moveIdx=i;
     if(isRecalc)rs.isRecalc=true;
     steps.push(rs);cur+=mv+sg+BOARD+ALIGHT;posNo=m.to;
@@ -1815,7 +1856,7 @@ function getCurrentFieldTimeMin(){const done=flatSteps.filter(s=>stepStatus[s.id
 async function recalcRemainingRoute(){
   const pending=flatSteps.filter(s=>s.kind==='ride'&&!stepStatus[s.id]);
   if(!pending.length)return;
-  let moves=pending.map(s=>({from:portNoFrom(s.from),to:portNoFrom(s.to),dist:s.dist}));
+  let moves=pending.map(s=>({from:portNoFrom(s.from),to:portNoFrom(s.to),dist:s.dist,n:s.n||1}));
   const curPosNo=getCurrentFieldPositionNo(),curTime=getCurrentFieldTimeMin(),curPos=PM[curPosNo];
 
   const hadRet=flatSteps.some(s=>s.kind==='ret'),retDone=flatSteps.some(s=>s.kind==='ret'&&stepStatus[s.id]==='done');
@@ -1886,12 +1927,14 @@ function renderHubStatus(){
 }
 
 function updateBar(){
-  const pairs=buildPairsOptimized(),paired=pairs.filter(m=>m.to);
+  const pairs=buildPlanMoves(),paired=pairs.filter(m=>m.to);
   const mn=Math.round(calcRouteTimeFrom(paired, commuteGo?PM[commuteGo]:START)); // 直線での概算
+  renderCrewButtons();
   const auto=(typeof autoApplied!=='undefined')&&autoApplied;
   document.getElementById('t-src').textContent=(auto?'⚡移動元 ':'移動元 ')+selVeh.size+'台';document.getElementById('t-src').className='chip '+(selVeh.size?'chip-sel':'chip-gray');
   document.getElementById('t-dst').textContent=(auto?'⚡移動先 ':'移動先 ')+selDst.size+'台';document.getElementById('t-dst').className='chip '+(selDst.size?'chip-sel':'chip-gray');
-  document.getElementById('t-pair').textContent=`ペア ${paired.length}組`;document.getElementById('t-pair').className='chip '+(paired.length?'chip-sel':'chip-gray');
+  const nb=paired.reduce((a,m)=>a+(m.n||1),0);
+  document.getElementById('t-pair').textContent=crewSize>1?`${paired.length}便（${nb}台）`:`ペア ${paired.length}組`;document.getElementById('t-pair').className='chip '+(paired.length?'chip-sel':'chip-gray');
   document.getElementById('t-time').textContent=`推定 ${mn}分`;document.getElementById('t-time').className='chip '+(mn===0?'chip-gray':mn<=90?'chip-ok':'chip-warn');
   renderPairs(pairs);renderHubStatus();
 }
@@ -1899,6 +1942,14 @@ function updateBar(){
 function renderPairs(pairs){
   const pw=document.getElementById('pairs-wrap');
   const paired=pairs.filter(m=>m.to);if(!paired.length){pw.innerHTML='';return;}
+  if(crewSize>1){
+    const nb=paired.reduce((a,m)=>a+(m.n||1),0);
+    let hh=`<div class="card"><div class="card-body"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <span style="font-size:13px;font-weight:700;color:#e67e22">👥 ${crewSize}人でまとめて移動（${paired.length}便・${nb}台）</span>
+      <span style="font-size:11px;color:var(--text3)">全員で同じ移動元から同じ移動先へ。歩きも一緒</span></div>`;
+    paired.forEach((p,i)=>{hh+=`<div class="pair-row"><span style="font-size:12px;color:var(--text4);min-width:18px;font-weight:600">${i+1}</span><span style="color:var(--blue);font-weight:700">[${p.from}] ${PM[p.from].name}</span><span style="color:var(--text4);font-size:13px;margin:0 4px">→</span><span style="color:var(--red);font-weight:700">[${p.to}] ${PM[p.to].name}</span><span style="font-size:12px;padding:1px 7px;border-radius:10px;background:#fdebd0;color:#a04000;font-weight:700">×${p.n}台</span><span style="font-size:12px;color:var(--text3);font-weight:600;margin-left:auto">${p.dist.toLocaleString()}m</span></div>`;});
+    pw.innerHTML=hh+'</div></div>';return;
+  }
   const mi=manualPairInfo;
   let h=`<div class="card"><div class="card-body"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">`;
   if(mi){
@@ -1921,8 +1972,16 @@ function renderPairs(pairs){
     h+='</div>';});
   pw.innerHTML=h+'</div></div>';
 }
-function toggleVeh(vid){if(selVeh.has(vid))selVeh.delete(vid);else selVeh.add(vid);renderSrc();updateBar();}
-function toggleDst(slotId){if(selDst.has(slotId))selDst.delete(slotId);else selDst.add(slotId);renderDst();updateBar();}
+// 人数モード（2人・3人）では、チェックを入れるとそのポートの空き枠から人数分まで一緒にチェックする。
+// 外すときは押した1台だけ外す（「ここは2台だけ」などの調整用）。
+function crewAdd(set,id,count){
+  set.add(id);
+  if(crewSize<=1)return;
+  const no=id.split('-')[0];let added=1;
+  for(let k=0;k<count&&added<crewSize;k++){const sid=`${no}-${k}`;if(!set.has(sid)){set.add(sid);added++;}}
+}
+function toggleVeh(vid){if(selVeh.has(vid))selVeh.delete(vid);else crewAdd(selVeh,vid,srcSlotCount(vid.split('-')[0]));renderSrc();updateBar();}
+function toggleDst(slotId){if(selDst.has(slotId))selDst.delete(slotId);else crewAdd(selDst,slotId,dstSlotCount(slotId.split('-')[0]));renderDst();updateBar();}
 function renderSrc(){
   const el=document.getElementById('src-list');
   const srcs=ALL_PORTS.filter(p=>srcSlotCount(p.no)>0)
@@ -2004,7 +2063,7 @@ async function doRoute(keepTransit=false){
   // ※ buildPairsOptimized() が lastOptInfo.assign をセットするため、それより前にリセットする
   //   （以前は呼び出し後にリセットしており、再割当最適化チップが常に非表示になっていた）
   lastOptInfo={assign:0,route:0};if(!keepTransit)transitSelections={};
-  const pairs=buildPairsOptimized(),valid=pairs.filter(m=>m.to);
+  const pairs=buildPlanMoves(),valid=pairs.filter(m=>m.to);
   if(!valid.length){alert('移動元と移動先を選択してください');return;}
 
   const calcBtn = document.getElementById('calc-btn');
@@ -2113,7 +2172,7 @@ function renderRouteDisplay(resetField, opts={}){
   const lim=getEndMin()-getStartMin(),startMin=getStartMin(),over=totalMin>lim,n=currentOptRoute.length;
   const check={};ALL_PORTS.forEach(p=>check[p.no]=INV[p.no]??0);
   if(commuteGo)check[commuteGo]=(check[commuteGo]||0)+1;
-  currentOptRoute.forEach(m=>{check[m.from]--;check[m.to]=(check[m.to]||0)+1;});
+  currentOptRoute.forEach(m=>{const k=m.n||1;check[m.from]-=k;check[m.to]=(check[m.to]||0)+k;});
   if(commuteRet&&currentOptRoute.length)check[commuteRet]=(check[commuteRet]||0)-1;
   const probs=Object.entries(check).filter(([,v])=>v<0);
   let h=`<div class="card"><div style="padding:10px 14px 0">`;
@@ -2151,6 +2210,7 @@ function renderRouteDisplay(resetField, opts={}){
     const fromColor=s.kind==='ride'||s.kind==='go'||s.kind==='ret'?'var(--blue)':'var(--text2)';
     const toColor=s.kind==='ride'?'var(--red)':s.kind==='go'||s.kind==='ret'?'var(--blue)':'var(--text)';
     let headExtra='';
+    if(s.kind==='ride'&&s.n>1)headExtra+=`<span style="font-size:12px;padding:2px 7px;border-radius:10px;background:#e67e22;color:#fff;font-weight:700">👥 ${s.n}台まとめて</span>`;
     if(s.kind==='ride'){headExtra+=s.isZero?`<span class="tag-z">ゼロ解消</span>`:`<span class="tag-d">補充</span>`;if(s.isRet)headExtra+=`<span class="tag-ret">帰宅経由</span>`;}
     if(s.kind==='walk'&&s.isVehRec)headExtra+=`<span class="tag-veh">バイク/車推奨</span>`;
     if(s.kind==='walk'&&s.walkKey&&transitSelections[s.walkKey])headExtra+=`<span style="font-size:12px;padding:2px 7px;border-radius:10px;background:var(--purple);color:#fff;font-weight:700">🚲 経由設定済</span>`;
@@ -2196,7 +2256,7 @@ function renderField(){
     let bg='#fff',numBg='',typeLabel='';
     if(s.kind==='go'||s.kind==='ret'){bg=isDone?'#f5f4f0':'#e8f4fb';numBg=isDone?'#aaa':'var(--blue)';typeLabel=s.kind==='go'?'出発':'帰宅';}
     else if(s.kind==='walk'){bg=isDone?'#f5f4f0':'#f9f8f5';numBg=isDone?'#aaa':'#888';typeLabel='徒歩';}
-    else{bg=isDone?'#f5f4f0':'#fff';numBg=isDone?'#aaa':'var(--blue)';typeLabel='車両移動';}
+    else{bg=isDone?'#f5f4f0':'#fff';numBg=isDone?'#aaa':'var(--blue)';typeLabel=s.n>1?`車両移動 👥${s.n}台まとめて`:'車両移動';}
     if(isSkip)bg='#f5f4f0';
     const accOver=(s.arr-startMin)>lim;
     const numLabel=s.kind==='ride'?`乗${rideNo[s.id]}`:s.kind==='go'?'発':s.kind==='ret'?'帰':'歩';
@@ -3818,7 +3878,8 @@ let stockMap=null, stockMarkers=[], stockFitted=false, stockLiveBusy=false;
 // 1つのステップが動かす台数 [[ポート, 増減], ...]
 function stepDeltas(s){
   const f=portNoFrom(s.from||''), t=portNoFrom(s.to||'');
-  if(s.kind==='ride'||s.kind==='go'||s.kind==='ret') return [[f,-1],[t,+1]];
+  if(s.kind==='ride'){const k=s.n||1;return [[f,-k],[t,+k]];}
+  if(s.kind==='go'||s.kind==='ret') return [[f,-1],[t,+1]];
   if(s.kind==='car-pickup') return [[t,-(s.nBikes||1)]];
   if(s.kind==='car-drop')   return [[t,+(s.nUnload||1)]];
   return [];
