@@ -1783,16 +1783,16 @@ function buildFlatStepsCore(route,opts={}){
     // 同じポートじゃないなら移動が発生 (OSRMでも1leg消費)
     if (posNo !== m.from) {
       const fallbackWd=Math.round(gd(PM[posNo],f));
-      const walkDist = getRealDist('foot',fallbackWd);
-      
       const tKey=`${posNo}-${m.from}`;
       const tr=withTransit?(transitSelections[tKey]||null):null;
-      if(tr&&tr.pickupNo&&tr.dropoffNo&&PM[tr.pickupNo]&&PM[tr.dropoffNo]){
-        // ※経由設定がある場合は、OSRMの区間とはズレるのでとりあえず直線ベース（または別途APIを叩く必要があるが今回は簡略化）
+      const hasTr=!!(tr&&tr.pickupNo&&tr.dropoffNo&&PM[tr.pickupNo]&&PM[tr.dropoffNo]);
+      // 経由移動ありの区間は経由点が2つ増えている（buildRoutePoints）ので、道なり距離も3区間ぶん使う
+      const walkDist = hasTr ? fallbackWd : getRealDist('foot',fallbackWd);
+      if(hasTr){
         const pku=PM[tr.pickupNo],dro=PM[tr.dropoffNo];
-        const d1=Math.round(gd(PM[posNo],pku)),d2=Math.round(gd(pku,dro)),d3=Math.round(gd(dro,f));
+        const d1=getRealDist('foot',Math.round(gd(PM[posNo],pku))),d2=getRealDist('bike',Math.round(gd(pku,dro))),d3=getRealDist('foot',Math.round(gd(dro,f)));
         if(d1>0){const mv=d1/1000/betweenSpd()*60,sg=sigMin(d1);
-          steps.push({id:sid++,kind:'walk',from:posNo+'.'+PM[posNo].name,to:tr.pickupNo+'.'+pku.name,dist:d1,movMin:mv,sigMin2:sg,boardMin:0,total:mv+sg,dep:cur,arr:cur+mv+sg,isVehRec:false,isTransitWalk:true});cur+=mv+sg;}
+          steps.push({id:sid++,kind:'walk',from:posNo+'.'+PM[posNo].name,to:tr.pickupNo+'.'+pku.name,dist:d1,movMin:mv,sigMin2:sg,boardMin:0,total:mv+sg,dep:cur,arr:cur+mv+sg,isVehRec:false,isTransitWalk:true,walkKey:withTransit?tKey:undefined});cur+=mv+sg;}
         {const mv=d2/1000/BIKE_SPD*60,sg=sigMin(d2);
           steps.push({id:sid++,kind:'ride',from:tr.pickupNo+'.'+pku.name,to:tr.dropoffNo+'.'+dro.name,dist:d2,movMin:mv,sigMin2:sg,boardMin:BOARD+ALIGHT,total:mv+sg+BOARD+ALIGHT,dep:cur,arr:cur+mv+sg+BOARD+ALIGHT,isZero:false,isRet:false,isTransitRide:true,moveKey:`${tr.pickupNo}→${tr.dropoffNo}`});cur+=mv+sg+BOARD+ALIGHT;}
         if(d3>0){const mv=d3/1000/betweenSpd()*60,sg=sigMin(d3);
@@ -1870,8 +1870,14 @@ function renderTransitModal(){
 }
 function selectTransitPickup(no){transitModalState.pickupNo=no;if(transitModalState.dropoffNo===no)transitModalState.dropoffNo=null;renderTransitModal();}
 function selectTransitDropoff(no){transitModalState.dropoffNo=no;renderTransitModal();}
-function applyTransit(){const{fromNo,toNo,pickupNo,dropoffNo}=transitModalState;if(!pickupNo||!dropoffNo)return;transitSelections[`${fromNo}-${toNo}`]={pickupNo,dropoffNo};document.getElementById('transit-modal').style.display='none';doRoute(true);if(currentMode==='field')renderField();}
-function clearTransit(){const{fromNo,toNo}=transitModalState;delete transitSelections[`${fromNo}-${toNo}`];document.getElementById('transit-modal').style.display='none';doRoute(true);if(currentMode==='field')renderField();}
+function applyTransit(){const{fromNo,toNo,pickupNo,dropoffNo}=transitModalState;if(!pickupNo||!dropoffNo)return;transitSelections[`${fromNo}-${toNo}`]={pickupNo,dropoffNo};document.getElementById('transit-modal').style.display='none';rerouteAfterTransit();}
+function clearTransit(){const{fromNo,toNo}=transitModalState;delete transitSelections[`${fromNo}-${toNo}`];document.getElementById('transit-modal').style.display='none';rerouteAfterTransit();}
+// 経由移動を変えたら、手順・地図・印刷表を作り直す。現場モード中ならそのまま現場モード（同じ表示範囲）に戻す
+async function rerouteAfterTransit(){
+  const wasField=fieldActive, keepStart=fieldWin.start;
+  await doRoute(true);
+  if(wasField){ startField(); fieldWin.start=keepStart; applyFieldWindow(); }
+}
 function closeTransitModal(e){if(e&&e.target!==document.getElementById('transit-modal'))return;document.getElementById('transit-modal').style.display='none';}
 
 // ════════════════════════════════════════════════
@@ -2102,6 +2108,25 @@ function renderDst(){
 }
 
 // ── ルート計算 (OSRM連携を組み込み) ──
+// 地図・道なり距離用の経由点列。経由移動（徒歩の代わりに途中で1台乗る）を設定した区間は
+// 「乗るポート→降りるポート」も経由点に入れる（buildFlatStepsCore の区間の数と必ず一致させる）
+function buildRoutePoints(base){
+  const points = commuteGo ? [START, PM[commuteGo]] : [base.length ? PM[base[0].from] : START];
+  base.forEach(m => {
+    const last=points[points.length-1];
+    if (last.no !== m.from){
+      const tr=transitSelections[`${last.no}-${m.from}`];
+      if(tr&&tr.pickupNo&&tr.dropoffNo&&PM[tr.pickupNo]&&PM[tr.dropoffNo]){ points.push(PM[tr.pickupNo]); points.push(PM[tr.dropoffNo]); }
+      points.push(PM[m.from]);
+    }
+    points.push(PM[m.to]);
+  });
+  if (commuteRet && PM[commuteRet]) {
+    if (points[points.length-1].no !== commuteRet) points.push(PM[commuteRet]); // 帰宅ポートが訪問順に無い場合は経由点として追加（buildFlatStepsCoreの徒歩+帰宅レグと整合）
+    points.push(START); // 帰宅
+  }
+  return points;
+}
 async function doRoute(keepTransit=false){
   // ※ buildPairsOptimized() が lastOptInfo.assign をセットするため、それより前にリセットする
   //   （以前は呼び出し後にリセットしており、再割当最適化チップが常に非表示になっていた）
@@ -2134,15 +2159,7 @@ async function doRoute(keepTransit=false){
 
   // --- OSRM APIで実際の道路情報を取得 ---
   // 持込(commuteGo)がある場合は 046→持込先 の区間もOSRMに含める（発ステップとleg数を一致させ、距離のズレ/直線フォールバックを防ぐ）
-  let points = commuteGo ? [START, PM[commuteGo]] : [base.length ? PM[base[0].from] : START];
-  base.forEach(m => {
-    if (points[points.length - 1].no !== m.from) points.push(PM[m.from]);
-    points.push(PM[m.to]);
-  });
-  if (commuteRet && PM[commuteRet]) {
-    if (points[points.length-1].no !== commuteRet) points.push(PM[commuteRet]); // 帰宅ポートが訪問順に無い場合は経由点として追加（buildFlatStepsCoreの徒歩+帰宅レグと整合）
-    points.push(START); // 帰宅
-  }
+  let points = buildRoutePoints(base);
 
   // 乗り=自転車プロファイル（一方通行を反映）、戻り=歩行者プロファイル（一方通行無視・最短）を並行取得
   const [bikeRoute, footRoute] = await Promise.all([
@@ -2181,15 +2198,7 @@ async function shiftMove(idx,dir){
   calcBtn.disabled = true;
   calcBtn.textContent = '再計算中...';
   
-  let points = commuteGo ? [START, PM[commuteGo]] : [currentOptRoute.length ? PM[currentOptRoute[0].from] : START];
-  currentOptRoute.forEach(m => {
-    if (points[points.length - 1].no !== m.from) points.push(PM[m.from]);
-    points.push(PM[m.to]);
-  });
-  if (commuteRet && PM[commuteRet]) {
-    if (points[points.length-1].no !== commuteRet) points.push(PM[commuteRet]);
-    points.push(START);
-  }
+  let points = buildRoutePoints(currentOptRoute);
 
   const [bikeRoute, footRoute] = await Promise.all([
     fetchRealRoute(points, ROUTE_BIKE, true),
@@ -2259,11 +2268,12 @@ function renderRouteDisplay(resetField, opts={}){
     if(s.kind==='walk'&&s.walkKey&&transitSelections[s.walkKey])headExtra+=`<span style="font-size:12px;padding:2px 7px;border-radius:10px;background:var(--purple);color:#fff;font-weight:700">🚲 経由設定済</span>`;
     const moveLabel=s.kind==='walk'?(pairMode==='car'?`車など（${CAR_SPD}km/h）`:`徒歩（${WALK_SPD}km/h）`):`シェアバイク（${BIKE_SPD}km/h）`;
     const orderBtns=s.kind==='ride'&&!s.isTransitRide?`<div style="display:flex;flex-direction:column;gap:3px;margin-left:auto;flex-shrink:0">${s.moveIdx>0?`<button class="ord-btn" onclick="shiftMove(${s.moveIdx},-1)">↑</button>`:`<div class="ord-ph"></div>`}${s.moveIdx<n-1?`<button class="ord-btn" onclick="shiftMove(${s.moveIdx},1)">↓</button>`:`<div class="ord-ph"></div>`}</div>`:'';
-    const transitBtn=s.kind==='walk'&&s.walkKey&&s.dist>=VEH_THR?`<div style="padding:6px 12px 2px"><button class="set-transit-btn${transitSelections[s.walkKey]?' active':''}" onclick="showTransitModal('${s.walkKey}')">🚲 経由移動を${transitSelections[s.walkKey]?'変更':'設定'}</button></div>`:'';
+    const transitBtn=s.kind==='walk'&&s.walkKey&&(s.dist>=VEH_THR||transitSelections[s.walkKey])?`<div style="padding:6px 12px 2px"><button class="set-transit-btn${transitSelections[s.walkKey]?' active':''}" onclick="showTransitModal('${s.walkKey}')">🚲 経由移動を${transitSelections[s.walkKey]?'変更':'設定'}</button></div>`:'';
     h+=`<div class="step-wrap" style="padding:0 14px"><div class="step-line"><div class="step-node ${nodeClass}">${label}</div>${!isLast?'<div class="step-conn"></div>':''}</div><div class="step-card ${cardClass}" style="display:flex;flex-direction:column"><div style="display:flex;gap:8px;align-items:flex-start"><div style="flex:1;min-width:0"><div class="step-head"><span style="font-size:14px;font-weight:700;color:${fromColor}">${s.from}</span><span style="color:var(--text4);font-size:13px">→</span><span style="font-size:14px;font-weight:700;color:${toColor}">${s.to}</span>${headExtra}<span class="step-time${accOver?' ov':''}">${fmtTime(s.dep)}→<strong>${fmtTime(s.arr)}</strong> +${Math.round(s.total)}分</span></div><div class="step-detail"><span class="detail-item"><span class="dic dic-move">移</span>${s.dist.toLocaleString()}m ${Math.round(s.movMin)}分 <span>${moveLabel}</span></span><span class="detail-item"><span class="dic dic-sig">信</span>${Math.round(s.sigMin2*10)/10}分</span>${s.boardMin>0?`<span class="detail-item"><span class="dic dic-board">乗降</span>${s.boardMin}分</span>`:''}${s.note?`<span style="font-size:12px;font-weight:600;color:var(--blue);margin-left:auto">${s.note}</span>`:''}</div></div>${orderBtns}</div>${transitBtn}</div></div>`;
   });
   h+=`<div style="padding:12px 14px 14px;display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-blue" onclick="startField()" style="font-size:15px;min-height:48px">現場モードで開く ↗</button></div></div>`;
   document.getElementById('route-wrap').innerHTML=h;
+  renderPrintTable();   // 印刷表も最新の手順（経由移動を含む）に合わせる
   if(resetField) {
     document.getElementById('map-container').scrollIntoView({behavior:'smooth',block:'start'});
   }
@@ -2306,7 +2316,7 @@ function renderField(){
     const isRetStyle=s.kind==='ret';
     h+=`<div class="field-step${isDone?' done':''}${isSkip?' skipped':''}" style="background:${bg}"><div class="fs-header"><div class="fs-num" style="${isRetStyle?'border:2px solid var(--text);background:transparent;color:var(--text)':'background:'+numBg}">${numLabel}</div><div class="fs-title"><div class="fs-from">${s.from}</div><div class="fs-to">→ ${s.to}</div></div><div class="fs-time"><span>${fmtTime(s.dep)}</span><strong style="color:${accOver?'var(--orange)':'var(--text)'}">${fmtTime(s.arr)}</strong></div></div><div class="fs-body"><span class="chip chip-gray">${typeLabel} ${s.dist.toLocaleString()}m</span><span class="chip chip-gray">+${Math.round(s.total)}分</span>${s.kind==='walk'&&s.isVehRec?`<span class="chip chip-purple">バイク/車推奨</span>`:''}${s.kind==='walk'&&s.walkKey&&transitSelections[s.walkKey]?`<span class="chip" style="background:var(--purple);color:#fff;font-size:11px">🚲 経由設定済</span>`:''}${s.kind==='ride'&&s.isZero?`<span class="chip chip-red">ゼロ解消</span>`:''}${s.isRecalc?`<span class="chip chip-purple" style="font-size:10px">再計算</span>`:''}${isDone?`<span class="chip chip-ok">✓ 完了</span>`:''}${isSkip?`<span class="chip chip-gray">スキップ済</span>`:''}</div>`;
     if(!isDone&&!isSkip){
-      if(s.kind==='walk'&&s.walkKey&&s.dist>=VEH_THR)h+=`<div class="fs-actions"><button class="done-btn" onclick="markStep(${s.id},'done')">✓ 完了</button><button class="set-transit-btn${transitSelections[s.walkKey]?' active':''}" style="min-height:44px" onclick="showTransitModal('${s.walkKey}')">🚲 経由${transitSelections[s.walkKey]?'変更':'設定'}</button><button class="skip-btn" onclick="markStep(${s.id},'skip')">スキップ</button></div>`;
+      if(s.kind==='walk'&&s.walkKey&&(s.dist>=VEH_THR||transitSelections[s.walkKey]))h+=`<div class="fs-actions"><button class="done-btn" onclick="markStep(${s.id},'done')">✓ 完了</button><button class="set-transit-btn${transitSelections[s.walkKey]?' active':''}" style="min-height:44px" onclick="showTransitModal('${s.walkKey}')">🚲 経由${transitSelections[s.walkKey]?'変更':'設定'}</button><button class="skip-btn" onclick="markStep(${s.id},'skip')">スキップ</button></div>`;
       else if(s.kind==='ride')h+=`<div class="fs-actions"><button class="done-btn" onclick="markStep(${s.id},'done')">✓ 完了</button><button class="skip-btn" onclick="showSkipModal(${s.id})">スキップ ▾</button></div>`;
       else h+=`<div class="fs-actions"><button class="done-btn" onclick="markStep(${s.id},'done')">✓ 完了</button><button class="skip-btn" onclick="markStep(${s.id},'skip')">スキップ</button></div>`;
     }else h+=`<div class="fs-actions"><button class="skip-btn" onclick="markStep(${s.id},'')" style="flex:1">元に戻す</button></div>`;
@@ -2314,6 +2324,12 @@ function renderField(){
   });
   el.innerHTML=h;
 
+  renderPrintTable();
+}
+
+function renderPrintTable(){
+  const el=document.getElementById('print-table'); if(!el) return;
+  if(!flatSteps.length){ el.innerHTML=''; return; }
   const startMin2=getStartMin(),lim2=getEndMin()-getStartMin();
   let rc2=0,ptHTML=`<thead><tr style="background:#1a1a18;color:#fff"><th style="padding:4px 6px;text-align:center">#</th><th style="padding:4px 6px;text-align:center">種別</th><th style="padding:4px 8px;text-align:left">移動元</th><th style="padding:4px 4px;text-align:center">→</th><th style="padding:4px 8px;text-align:left">移動先</th><th style="padding:4px 6px;text-align:center">距離</th><th style="padding:4px 6px;text-align:center">出発</th><th style="padding:4px 6px;text-align:center">到着</th><th style="padding:4px 6px;text-align:center">所要</th><th style="padding:4px 6px;text-align:center">✓</th></tr></thead><tbody>`;
   flatSteps.forEach((s,i)=>{
@@ -2328,7 +2344,6 @@ function renderField(){
   ptHTML+=`<tr style="background:#1a1a18;color:#fff;font-weight:700"><td colspan="8" style="padding:4px 8px;font-size:10px">合計 ${dk}/${flatSteps.filter(s=>stepStatus[s.id]!=='skip').length}完了 開始${fmtTime(startMin2)}→終了${fmtTime(startMin2+tot2)}</td><td style="padding:4px 6px;text-align:center;font-size:10px">+${Math.round(tot2)}分</td><td></td></tr></tbody>`;
   document.getElementById('print-table').innerHTML=ptHTML;
 }
-
 function startField(){
   document.getElementById('route-wrap').style.display='none';
   document.getElementById('pairs-wrap').style.display='none';
