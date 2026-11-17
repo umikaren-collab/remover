@@ -230,6 +230,8 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
 .fq-btn:disabled{opacity:.5;cursor:default}
 .crew-btn{background:#333;border-color:#666}
 .crew-btn.on{background:#e67e22;border-color:#f5b041}
+.pm-btn{background:#333;border-color:#666}
+.pm-btn.on{background:#1e8449;border-color:#58d68d}
 
 /* マップ上のポート名ラベル */
 .leaflet-tooltip.port-label{
@@ -256,7 +258,7 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
 #print-area.print-prep #print-header2 .ph-title{font-size:14px;font-weight:700}
 #print-area.print-prep .print-table2{width:100%;border-collapse:collapse;font-size:10px}
 #print-area.print-prep #print-map-slot{margin-top:6mm;border:1px solid #999}
-#print-area.print-prep #print-map-slot,#print-area.print-prep #print-map-slot>div{height:95mm;width:100%}
+#print-area.print-prep #print-map-slot,#print-area.print-prep #print-map-slot>div{width:100%}
 
 @media print{
   body{background:#fff;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -271,7 +273,7 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
   #print-header2 .ph-title{font-size:14px;font-weight:700}
   .print-table2{width:100%;border-collapse:collapse;font-size:10px}
   #print-map-slot{page-break-inside:avoid;margin-top:6mm;border:1px solid #999}
-  #print-map-slot,#print-map-slot > div{height:95mm!important;width:100%!important}
+  #print-map-slot,#print-map-slot > div{width:100%!important}  /* 高さは印刷設定で指定（インライン） */
   @page{size:A4 portrait;margin:8mm}
 }
 
@@ -350,7 +352,7 @@ select:focus,input:focus{outline:none;border-color:var(--text3)}
   <span class="chip chip-gray" id="t-dst">移動先 0台</span>
   <span class="chip chip-gray" id="t-pair">ペア 0組</span>
   <span class="chip chip-gray" id="t-time">推定 0分</span>
-  <div class="ml"><span class="fq-wrap" style="margin:0 8px 0 0"><span class="fq-lab">人数</span><button class="fq-btn crew-btn" data-n="1" onclick="setCrew(1)">1人</button><button class="fq-btn crew-btn" data-n="2" onclick="setCrew(2)">2人</button><button class="fq-btn crew-btn" data-n="3" onclick="setCrew(3)">3人</button></span><button class="btn btn-p" id="calc-btn" onclick="doRoute()" style="padding:8px 16px;min-height:40px;font-size:14px">ルート計算 ↗</button><span class="fq-wrap"><span class="fq-lab">計算して現場へ</span><button class="fq-btn" onclick="doRouteField(3)">3件</button><button class="fq-btn" onclick="doRouteField(5)">5件</button><button class="fq-btn" onclick="doRouteField(8)">8件</button><button class="fq-btn" onclick="doRouteField('all')">全部</button></span><button class="btn" onclick="doPrint('plan')" style="padding:8px 14px;min-height:40px;font-size:14px;margin-left:6px">🖨 印刷</button></div>
+  <div class="ml"><span class="fq-wrap" style="margin:0 8px 0 0"><span class="fq-lab" title="自転車を置いた後、次の移動元へどう移動するか">合間の移動</span><button class="fq-btn pm-btn" data-m="walk" onclick="setPairMode('walk')" title="徒歩＋乗車の合計時間が最短になるように組む">🚶徒歩</button><button class="fq-btn pm-btn" data-m="car" onclick="setPairMode('car')" title="自転車で走る距離の合計が最短になるように組む">🚗車</button></span><span class="fq-wrap" style="margin:0 8px 0 0"><span class="fq-lab">人数</span><button class="fq-btn crew-btn" data-n="1" onclick="setCrew(1)">1人</button><button class="fq-btn crew-btn" data-n="2" onclick="setCrew(2)">2人</button><button class="fq-btn crew-btn" data-n="3" onclick="setCrew(3)">3人</button></span><button class="btn btn-p" id="calc-btn" onclick="doRoute()" style="padding:8px 16px;min-height:40px;font-size:14px">ルート計算 ↗</button><span class="fq-wrap"><span class="fq-lab">計算して現場へ</span><button class="fq-btn" onclick="doRouteField(3)">3件</button><button class="fq-btn" onclick="doRouteField(5)">5件</button><button class="fq-btn" onclick="doRouteField(8)">8件</button><button class="fq-btn" onclick="doRouteField('all')">全部</button></span><button class="btn" onclick="doPrint('plan')" style="padding:8px 14px;min-height:40px;font-size:14px;margin-left:6px">🖨 印刷</button></div>
 </div>
 
 <div id="mode-plan" style="display: none;">
@@ -1364,17 +1366,23 @@ function initOrUpdateMap(mapId, points, osrmRoute) {
   if(mapId === 'map-container') { mapRouteLine = targetRouteLine; mapMarkers = targetMarkers; }
   else { carRouteLine = targetRouteLine; carMarkers = targetMarkers; }
 
-  // ズームを調整（線が引けない＝1点だけの時は中心に寄せる）
-  try {
-    if (targetRouteLine && points.length >= 2) {
-      targetMap.fitBounds(targetRouteLine.getBounds(), {padding: [20, 20]});
-    } else if (points.length === 1) {
-      targetMap.setView([points[0].lat, points[0].lng], 16);
-    }
-  } catch(e) { /* bounds 計算失敗時は現状維持 */ }
-  
-  // 表示のバグを防ぐためにリサイズ
-  setTimeout(() => targetMap.invalidateSize(), 300);
+  // ズームを調整：表示中の地点（ポート名ラベル込み）が全部見えるように自動で合わせる
+  const doFit=()=>{ try{ fitRouteView(targetMap, targetRouteLine, points); }catch(e){} };
+  targetMap.invalidateSize(false);
+  doFit();
+  // 画面の切り替え直後は地図の大きさが確定していないことがあるので、少し待って合わせ直す
+  setTimeout(()=>{ targetMap.invalidateSize(false); doFit(); }, 350);
+}
+// 地点が全部（右側のポート名ラベルも含めて）見えるように地図を合わせる
+function fitRouteView(targetMap, line, points){
+  if(!targetMap) return;
+  const ll=(points||[]).filter(p=>p&&Number.isFinite(p.lat)).map(p=>[p.lat,p.lng]);
+  if(ll.length===1){ targetMap.setView(ll[0],16); return; }
+  let b=ll.length?L.latLngBounds(ll):null;
+  if(line){ try{ const lb=line.getBounds(); b=b?b.extend(lb):lb; }catch(e){} }
+  if(!b) return;
+  const labelW = (typeof mapLabelMode!=='undefined' && mapLabelMode==='none') ? 30 : (mapLabelMode==='num' ? 70 : 170);
+  targetMap.fitBounds(b,{paddingTopLeft:[30,30],paddingBottomRight:[labelW,30],maxZoom:17,animate:false});
 }
 
 // ════════════════════════════════════════════════
@@ -1544,6 +1552,18 @@ function dstSlotCount(no){
 function resetExtraSlots(){extraSrcSlots={};extraDstSlots={};autoApplied=false;showRoomSlots=false;}
 function toggleRoomSlots(){showRoomSlots=!showRoomSlots;renderDst();updateBar();}
 
+// ── 移動の合間（自転車を置いてから次の移動元まで）の手段 ──
+//   'walk' … 徒歩。徒歩＋乗車の合計時間が最短になる組み合わせ・順番を選ぶ（従来どおり）
+//   'car'  … 車など。合間は速いので、自転車で走る距離（乗車距離）の合計が最短の組み合わせを選び、
+//            順番は車での移動時間が短くなるよう並べる
+let pairMode=(()=>{try{const v=JSON.parse(localStorage.getItem('shsac6_pairmode'));return v==='car'?'car':'walk';}catch(e){return 'walk';}})();
+function betweenSpd(){return pairMode==='car'?CAR_SPD:WALK_SPD;}
+function betweenMin(d){return travelMin(d,betweenSpd());}
+function setPairMode(m){
+  pairMode=m;try{localStorage.setItem('shsac6_pairmode',JSON.stringify(m));}catch(e){}
+  manualAssign=null;renderPairModeButtons();updateBar();
+}
+function renderPairModeButtons(){document.querySelectorAll('.pm-btn').forEach(b=>b.classList.toggle('on',b.dataset.m===pairMode));}
 function buildPairsOptimized(){
   const vehicles=[];
   selVeh.forEach(vid=>{const[no,ki]=vid.split('-');if(parseInt(ki)<srcSlotCount(no))vehicles.push({vid,from:no});});
@@ -1568,9 +1588,15 @@ function buildPairsOptimized(){
   const baselineTime=calcRouteTimeFrom(twoOptGeneric(nn(initMoves,startPort),r=>calcRouteTimeFrom(r,startPort),30),startPort);
 
   // ── ②割当×順序 同時最適化：総所要時間そのものを目的関数に、組み合わせと順序を一緒に見直す ──
-  const{route:optRoute,totalTime:optTime}=jointOptimize(initMoves,startPort);
-
+  let{route:optRoute,totalTime:optTime}=jointOptimize(initMoves,startPort);
   lastOptInfo.assign=Math.round((baselineTime-optTime)*10)/10;
+  if(pairMode==='car'){
+    // 乗車距離の合計が最短の組み合わせ（①の結果）をそのまま使い、順番だけ最適化する
+    const cost=r=>calcRouteTimeFrom(r,startPort);
+    optRoute=twoOptGeneric(nn(initMoves,startPort),cost,50).map(m=>({...m}));
+    let pp=startPort;optRoute.forEach(m=>{m.wd=Math.round(gd(pp,PM[m.from]));pp=PM[m.to];});
+    optTime=cost(optRoute);lastOptInfo.assign=0;
+  }
   manualPairInfo=null;
 
   // ── ③手動の組み替え：ユーザーが行き先を入れ替えた場合は、その組み合わせを固定し順序だけ最適化 ──
@@ -1632,7 +1658,7 @@ function buildPlanMoves(){
       Object.keys(dem).forEach(t=>{if(dem[t]<=0||f===t||sameGroup(f,t))return;
         const k=Math.min(crewSize,sup[f],dem[t]);
         const wd=gd(pos,PM[f]),rd=gd(PM[f],PM[t]);
-        const tm=travelMin(wd,WALK_SPD)+travelMin(rd,BIKE_SPD)+BOARD+ALIGHT;
+        const tm=(pairMode==='car'?betweenMin(wd)*0.2:betweenMin(wd))+travelMin(rd,BIKE_SPD)+BOARD+ALIGHT;   // 車のときは乗車距離を重視
         const sc=tm/k;   // 1台あたりの時間が一番短い便を選ぶ
         if(sc<bs){bs=sc;best={from:f,to:t,n:k,dist:Math.round(rd)};}
       });});
@@ -1652,7 +1678,7 @@ function expandMoves(ms){return ms.flatMap(m=>Array.from({length:m.n||1},()=>({.
 function calcRouteTimeFrom(route,startPort){
   let t=0,pos=startPort;
   route.forEach(m=>{
-    const wd=gd(pos,PM[m.from]);t+=travelMin(wd,WALK_SPD);
+    const wd=gd(pos,PM[m.from]);t+=betweenMin(wd);
     const rd=m.dist||Math.round(gd(PM[m.from],PM[m.to]));t+=travelMin(rd,BIKE_SPD)+BOARD+ALIGHT;
     if(sameGroup(m.from,m.to))t+=10000;   // グループ内どうしの移動は事実上禁止
     pos=PM[m.to];
@@ -1765,14 +1791,14 @@ function buildFlatStepsCore(route,opts={}){
         // ※経由設定がある場合は、OSRMの区間とはズレるのでとりあえず直線ベース（または別途APIを叩く必要があるが今回は簡略化）
         const pku=PM[tr.pickupNo],dro=PM[tr.dropoffNo];
         const d1=Math.round(gd(PM[posNo],pku)),d2=Math.round(gd(pku,dro)),d3=Math.round(gd(dro,f));
-        if(d1>0){const mv=d1/1000/WALK_SPD*60,sg=sigMin(d1);
+        if(d1>0){const mv=d1/1000/betweenSpd()*60,sg=sigMin(d1);
           steps.push({id:sid++,kind:'walk',from:posNo+'.'+PM[posNo].name,to:tr.pickupNo+'.'+pku.name,dist:d1,movMin:mv,sigMin2:sg,boardMin:0,total:mv+sg,dep:cur,arr:cur+mv+sg,isVehRec:false,isTransitWalk:true});cur+=mv+sg;}
         {const mv=d2/1000/BIKE_SPD*60,sg=sigMin(d2);
           steps.push({id:sid++,kind:'ride',from:tr.pickupNo+'.'+pku.name,to:tr.dropoffNo+'.'+dro.name,dist:d2,movMin:mv,sigMin2:sg,boardMin:BOARD+ALIGHT,total:mv+sg+BOARD+ALIGHT,dep:cur,arr:cur+mv+sg+BOARD+ALIGHT,isZero:false,isRet:false,isTransitRide:true,moveKey:`${tr.pickupNo}→${tr.dropoffNo}`});cur+=mv+sg+BOARD+ALIGHT;}
-        if(d3>0){const mv=d3/1000/WALK_SPD*60,sg=sigMin(d3);
+        if(d3>0){const mv=d3/1000/betweenSpd()*60,sg=sigMin(d3);
           steps.push({id:sid++,kind:'walk',from:tr.dropoffNo+'.'+dro.name,to:m.from+'.'+f.name,dist:d3,movMin:mv,sigMin2:sg,boardMin:0,total:mv+sg,dep:cur,arr:cur+mv+sg,isVehRec:false,isTransitWalk:true});cur+=mv+sg;}
       }else{
-        const isVehRec=walkDist>=VEH_THR,mv=walkDist/1000/WALK_SPD*60,sg=sigMin(walkDist);
+        const isVehRec=pairMode!=='car'&&walkDist>=VEH_THR,mv=walkDist/1000/betweenSpd()*60,sg=sigMin(walkDist);
         const st={id:sid++,kind:'walk',from:posNo+'.'+PM[posNo].name,to:m.from+'.'+f.name,dist:walkDist,movMin:mv,sigMin2:sg,boardMin:0,total:mv+sg,dep:cur,arr:cur+mv+sg,isVehRec};
         if(withTransit)st.walkKey=tKey;
         if(isRecalc)st.isRecalc=true;
@@ -1796,7 +1822,7 @@ function buildFlatStepsCore(route,opts={}){
     if(retPortNo!==posNo&&PM[retPortNo]){
       const fallbackWd=Math.round(gd(PM[posNo],PM[retPortNo]));
       const wd=getRealDist('foot',fallbackWd);
-      if(wd>0){const wmv=wd/1000/WALK_SPD*60,wsg=sigMin(wd);
+      if(wd>0){const wmv=wd/1000/betweenSpd()*60,wsg=sigMin(wd);
         steps.push({id:sid++,kind:'walk',from:posNo+'.'+PM[posNo].name,to:retPortNo+'.'+PM[retPortNo].name,
           dist:wd,movMin:wmv,sigMin2:wsg,boardMin:0,total:wmv+wsg,dep:cur,arr:cur+wmv+wsg,
           isVehRec:wd>=VEH_THR,note:'帰宅ポートへ移動'});
@@ -1929,7 +1955,7 @@ function renderHubStatus(){
 function updateBar(){
   const pairs=buildPlanMoves(),paired=pairs.filter(m=>m.to);
   const mn=Math.round(calcRouteTimeFrom(paired, commuteGo?PM[commuteGo]:START)); // 直線での概算
-  renderCrewButtons();
+  renderCrewButtons();renderPairModeButtons();
   const auto=(typeof autoApplied!=='undefined')&&autoApplied;
   document.getElementById('t-src').textContent=(auto?'⚡移動元 ':'移動元 ')+selVeh.size+'台';document.getElementById('t-src').className='chip '+(selVeh.size?'chip-sel':'chip-gray');
   document.getElementById('t-dst').textContent=(auto?'⚡移動先 ':'移動先 ')+selDst.size+'台';document.getElementById('t-dst').className='chip '+(selDst.size?'chip-sel':'chip-gray');
@@ -1939,19 +1965,36 @@ function updateBar(){
   renderPairs(pairs);renderHubStatus();
 }
 
+// 2つの考え方（合間＝徒歩／車）で組んだ場合の乗車距離・合間の距離を並べて見せる（直線距離の概算）
+function pairModeCompareHtml(paired){
+  const sp=commuteGo?PM[commuteGo]:START;
+  const sums=r=>{let w=0,rd=0,pos=sp;r.forEach(m=>{w+=gd(pos,PM[m.from]);rd+=gd(PM[m.from],PM[m.to]);pos=PM[m.to];});return{w,rd,n:r.length};};
+  const cur=sums(paired);
+  const keep={mode:pairMode,ma:manualAssign,mi:manualPairInfo,opt:{...lastOptInfo}};
+  pairMode=keep.mode==='car'?'walk':'car';manualAssign=null;
+  let alt;try{alt=sums(buildPlanMoves().filter(m=>m.to));}finally{pairMode=keep.mode;manualAssign=keep.ma;manualPairInfo=keep.mi;lastOptInfo=keep.opt;}
+  const nm=m=>m==='car'?'🚗車（乗車距離が最短）':'🚶徒歩（徒歩込みの合計時間が最短）';
+  const fm=v=>(v/1000).toFixed(2)+'km';
+  const same=Math.abs(cur.rd-alt.rd)<1&&Math.abs(cur.w-alt.w)<1;
+  return `<div style="font-size:12px;line-height:1.7;background:var(--gray-ll);border-radius:8px;padding:6px 10px;margin-bottom:8px">
+    <b>${nm(pairMode)}</b>：乗車 ${fm(cur.rd)}・合間 ${fm(cur.w)}<br>
+    <span style="color:var(--text3)">${same?'もう一方の考え方でも同じ組み合わせになります':`参考 ${nm(pairMode==='car'?'walk':'car')}：乗車 ${fm(alt.rd)}・合間 ${fm(alt.w)}`}</span></div>`;
+}
 function renderPairs(pairs){
   const pw=document.getElementById('pairs-wrap');
   const paired=pairs.filter(m=>m.to);if(!paired.length){pw.innerHTML='';return;}
   if(crewSize>1){
     const nb=paired.reduce((a,m)=>a+(m.n||1),0);
-    let hh=`<div class="card"><div class="card-body"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+    let hh=`<div class="card"><div class="card-body">${pairModeCompareHtml(paired)}<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
       <span style="font-size:13px;font-weight:700;color:#e67e22">👥 ${crewSize}人でまとめて移動（${paired.length}便・${nb}台）</span>
       <span style="font-size:11px;color:var(--text3)">全員で同じ移動元から同じ移動先へ。歩きも一緒</span></div>`;
     paired.forEach((p,i)=>{hh+=`<div class="pair-row"><span style="font-size:12px;color:var(--text4);min-width:18px;font-weight:600">${i+1}</span><span style="color:var(--blue);font-weight:700">[${p.from}] ${PM[p.from].name}</span><span style="color:var(--text4);font-size:13px;margin:0 4px">→</span><span style="color:var(--red);font-weight:700">[${p.to}] ${PM[p.to].name}</span><span style="font-size:12px;padding:1px 7px;border-radius:10px;background:#fdebd0;color:#a04000;font-weight:700">×${p.n}台</span><span style="font-size:12px;color:var(--text3);font-weight:600;margin-left:auto">${p.dist.toLocaleString()}m</span></div>`;});
     pw.innerHTML=hh+'</div></div>';return;
   }
   const mi=manualPairInfo;
-  let h=`<div class="card"><div class="card-body"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">`;
+  let h=`<div class="card"><div class="card-body">`;
+  h+=pairModeCompareHtml(paired);
+  h+=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">`;
   if(mi){
     const col=mi.diff>0.5?'var(--orange)':'var(--green)';
     h+=`<span style="font-size:13px;font-weight:700;color:var(--purple)">✋ 手動で組み替え中（${paired.length}組）</span>
@@ -2205,7 +2248,7 @@ function renderRouteDisplay(resetField, opts={}){
     if(s.kind==='go'){nodeClass='sn-go';cardClass='sc-go';}else if(s.kind==='ret'){nodeClass='sn-ret';cardClass='sc-ret';}
     else if(s.kind==='walk'){nodeClass='sn-walk';cardClass='sc-walk';}else{nodeClass='sn-ride';cardClass='sc-ride';}
     if(s.kind==='ride')rideCount++;
-    const label=s.kind==='go'?'発':s.kind==='ret'?'帰':s.kind==='walk'?'歩':`乗${rideCount}`;
+    const label=s.kind==='go'?'発':s.kind==='ret'?'帰':s.kind==='walk'?(pairMode==='car'?'車':'歩'):`乗${rideCount}`;
     const accOver=(s.arr-startMin)>lim;
     const fromColor=s.kind==='ride'||s.kind==='go'||s.kind==='ret'?'var(--blue)':'var(--text2)';
     const toColor=s.kind==='ride'?'var(--red)':s.kind==='go'||s.kind==='ret'?'var(--blue)':'var(--text)';
@@ -2214,7 +2257,7 @@ function renderRouteDisplay(resetField, opts={}){
     if(s.kind==='ride'){headExtra+=s.isZero?`<span class="tag-z">ゼロ解消</span>`:`<span class="tag-d">補充</span>`;if(s.isRet)headExtra+=`<span class="tag-ret">帰宅経由</span>`;}
     if(s.kind==='walk'&&s.isVehRec)headExtra+=`<span class="tag-veh">バイク/車推奨</span>`;
     if(s.kind==='walk'&&s.walkKey&&transitSelections[s.walkKey])headExtra+=`<span style="font-size:12px;padding:2px 7px;border-radius:10px;background:var(--purple);color:#fff;font-weight:700">🚲 経由設定済</span>`;
-    const moveLabel=s.kind==='walk'?`徒歩（${WALK_SPD}km/h）`:`シェアバイク（${BIKE_SPD}km/h）`;
+    const moveLabel=s.kind==='walk'?(pairMode==='car'?`車など（${CAR_SPD}km/h）`:`徒歩（${WALK_SPD}km/h）`):`シェアバイク（${BIKE_SPD}km/h）`;
     const orderBtns=s.kind==='ride'&&!s.isTransitRide?`<div style="display:flex;flex-direction:column;gap:3px;margin-left:auto;flex-shrink:0">${s.moveIdx>0?`<button class="ord-btn" onclick="shiftMove(${s.moveIdx},-1)">↑</button>`:`<div class="ord-ph"></div>`}${s.moveIdx<n-1?`<button class="ord-btn" onclick="shiftMove(${s.moveIdx},1)">↓</button>`:`<div class="ord-ph"></div>`}</div>`:'';
     const transitBtn=s.kind==='walk'&&s.walkKey&&s.dist>=VEH_THR?`<div style="padding:6px 12px 2px"><button class="set-transit-btn${transitSelections[s.walkKey]?' active':''}" onclick="showTransitModal('${s.walkKey}')">🚲 経由移動を${transitSelections[s.walkKey]?'変更':'設定'}</button></div>`:'';
     h+=`<div class="step-wrap" style="padding:0 14px"><div class="step-line"><div class="step-node ${nodeClass}">${label}</div>${!isLast?'<div class="step-conn"></div>':''}</div><div class="step-card ${cardClass}" style="display:flex;flex-direction:column"><div style="display:flex;gap:8px;align-items:flex-start"><div style="flex:1;min-width:0"><div class="step-head"><span style="font-size:14px;font-weight:700;color:${fromColor}">${s.from}</span><span style="color:var(--text4);font-size:13px">→</span><span style="font-size:14px;font-weight:700;color:${toColor}">${s.to}</span>${headExtra}<span class="step-time${accOver?' ov':''}">${fmtTime(s.dep)}→<strong>${fmtTime(s.arr)}</strong> +${Math.round(s.total)}分</span></div><div class="step-detail"><span class="detail-item"><span class="dic dic-move">移</span>${s.dist.toLocaleString()}m ${Math.round(s.movMin)}分 <span>${moveLabel}</span></span><span class="detail-item"><span class="dic dic-sig">信</span>${Math.round(s.sigMin2*10)/10}分</span>${s.boardMin>0?`<span class="detail-item"><span class="dic dic-board">乗降</span>${s.boardMin}分</span>`:''}${s.note?`<span style="font-size:12px;font-weight:600;color:var(--blue);margin-left:auto">${s.note}</span>`:''}</div></div>${orderBtns}</div>${transitBtn}</div></div>`;
@@ -2255,11 +2298,11 @@ function renderField(){
     const isDone=stepStatus[s.id]==='done',isSkip=stepStatus[s.id]==='skip';
     let bg='#fff',numBg='',typeLabel='';
     if(s.kind==='go'||s.kind==='ret'){bg=isDone?'#f5f4f0':'#e8f4fb';numBg=isDone?'#aaa':'var(--blue)';typeLabel=s.kind==='go'?'出発':'帰宅';}
-    else if(s.kind==='walk'){bg=isDone?'#f5f4f0':'#f9f8f5';numBg=isDone?'#aaa':'#888';typeLabel='徒歩';}
+    else if(s.kind==='walk'){bg=isDone?'#f5f4f0':'#f9f8f5';numBg=isDone?'#aaa':'#888';typeLabel=pairMode==='car'?'車で移動':'徒歩';}
     else{bg=isDone?'#f5f4f0':'#fff';numBg=isDone?'#aaa':'var(--blue)';typeLabel=s.n>1?`車両移動 👥${s.n}台まとめて`:'車両移動';}
     if(isSkip)bg='#f5f4f0';
     const accOver=(s.arr-startMin)>lim;
-    const numLabel=s.kind==='ride'?`乗${rideNo[s.id]}`:s.kind==='go'?'発':s.kind==='ret'?'帰':'歩';
+    const numLabel=s.kind==='ride'?`乗${rideNo[s.id]}`:s.kind==='go'?'発':s.kind==='ret'?'帰':(pairMode==='car'?'車':'歩');
     const isRetStyle=s.kind==='ret';
     h+=`<div class="field-step${isDone?' done':''}${isSkip?' skipped':''}" style="background:${bg}"><div class="fs-header"><div class="fs-num" style="${isRetStyle?'border:2px solid var(--text);background:transparent;color:var(--text)':'background:'+numBg}">${numLabel}</div><div class="fs-title"><div class="fs-from">${s.from}</div><div class="fs-to">→ ${s.to}</div></div><div class="fs-time"><span>${fmtTime(s.dep)}</span><strong style="color:${accOver?'var(--orange)':'var(--text)'}">${fmtTime(s.arr)}</strong></div></div><div class="fs-body"><span class="chip chip-gray">${typeLabel} ${s.dist.toLocaleString()}m</span><span class="chip chip-gray">+${Math.round(s.total)}分</span>${s.kind==='walk'&&s.isVehRec?`<span class="chip chip-purple">バイク/車推奨</span>`:''}${s.kind==='walk'&&s.walkKey&&transitSelections[s.walkKey]?`<span class="chip" style="background:var(--purple);color:#fff;font-size:11px">🚲 経由設定済</span>`:''}${s.kind==='ride'&&s.isZero?`<span class="chip chip-red">ゼロ解消</span>`:''}${s.isRecalc?`<span class="chip chip-purple" style="font-size:10px">再計算</span>`:''}${isDone?`<span class="chip chip-ok">✓ 完了</span>`:''}${isSkip?`<span class="chip chip-gray">スキップ済</span>`:''}</div>`;
     if(!isDone&&!isSkip){
@@ -2662,7 +2705,42 @@ function renderCarPairSummary(){
 
 // 印刷（添付PDFのイメージ＝タイトル＋ルート表＋地図）
 // ① 印刷エリアを画面にA4幅で表示し地図タイルを描画 → ② 読み込みを待つ → ③ 印刷 → ④ 復元
+// ── 印刷の設定（地図の範囲・大きさ）──
+const PRINT_SIZES={s:{label:'小',mm:80},m:{label:'中',mm:120},l:{label:'大',mm:170},xl:{label:'特大（ほぼ1ページ）',mm:240}};
+function loadPrintOpts(){try{return Object.assign({range:'screen',size:'m'},JSON.parse(localStorage.getItem('shsac6_printopts'))||{});}catch(e){return{range:'screen',size:'m'};}}
 function doPrint(mode){
+  mode = mode || currentMode;
+  if(mode==='car' && typeof carFlatSteps!=='undefined' && carFlatSteps.length) renderCarField();
+  const _t=document.getElementById(mode==='car'?'car-print-table':'print-table');
+  if(!_t||!_t.innerHTML.trim()){ alert('先にルートを計算してください'); return; }
+  if(!(mode==='car'?carMap:map)){ alert('地図がまだ読み込まれていません。ルート計算後にお試しください'); return; }
+  const o=loadPrintOpts();
+  const old=document.getElementById('print-opt-modal'); if(old) old.remove();
+  const m=document.createElement('div'); m.id='print-opt-modal';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px';
+  const radio=(name,val,label,cur)=>`<label style="display:flex;align-items:center;gap:6px;padding:6px 0;font-size:14px;cursor:pointer"><input type="radio" name="${name}" value="${val}" ${val===cur?'checked':''}>${label}</label>`;
+  m.innerHTML=`<div style="background:#fff;border-radius:12px;max-width:420px;width:100%;padding:16px 18px;box-shadow:0 6px 24px rgba(0,0,0,.3)">
+    <div style="font-size:16px;font-weight:800;margin-bottom:10px">🖨 印刷する地図</div>
+    <div style="font-size:13px;font-weight:700;color:#555">範囲</div>
+    ${radio('pr','screen','今画面に表示している範囲のまま（拡大・移動した状態を使う）',o.range)}
+    ${radio('pr','core','中心部だけ（046グローバルセンター・本社を除いて合わせる）',o.range)}
+    ${radio('pr','all','ルート全体',o.range)}
+    <div style="font-size:13px;font-weight:700;color:#555;margin-top:8px">大きさ（地図の高さ）</div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px 14px">${Object.entries(PRINT_SIZES).map(([k,v])=>radio('ps',k,`${v.label}（${v.mm}mm）`,o.size)).join('')}</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn" id="po-cancel" style="min-height:40px;padding:6px 14px;font-size:14px">やめる</button>
+      <button class="btn btn-blue" id="po-ok" style="min-height:40px;padding:6px 14px;font-size:14px">印刷する</button></div></div>`;
+  document.body.appendChild(m);
+  m.querySelector('#po-cancel').onclick=()=>m.remove();
+  m.addEventListener('click',e=>{if(e.target===m)m.remove();});
+  m.querySelector('#po-ok').onclick=()=>{
+    const range=m.querySelector('input[name=pr]:checked').value, size=m.querySelector('input[name=ps]:checked').value;
+    try{localStorage.setItem('shsac6_printopts',JSON.stringify({range,size}));}catch(e){}
+    m.remove();
+    doPrintRun(mode,{range,size});
+  };
+}
+function doPrintRun(mode,opts){
   mode = mode || currentMode;
   const tableEl = mode==='car' ? document.getElementById('car-print-table') : document.getElementById('print-table');
   const mapEl   = mode==='car' ? document.getElementById('car-map-container') : document.getElementById('map-container');
@@ -2685,13 +2763,32 @@ function doPrint(mode){
   // 地図ノードの元位置を記録
   const origParent=mapEl.parentNode, origNext=mapEl.nextSibling,
         origDisp=mapEl.style.display, origH=mapEl.style.height, origW=mapEl.style.width;
+  const screenBounds=tgtMap.getBounds();   // 画面で今見えている範囲
+  const mmH=(PRINT_SIZES[opts&&opts.size]||PRINT_SIZES.m).mm;
 
   // 印刷エリアを画面にA4幅で表示（地図のタイルを実描画させる）
   area.classList.add('print-prep');
   slot.appendChild(mapEl);
-  mapEl.style.display='block'; mapEl.style.width='100%'; mapEl.style.height='95mm';
+  slot.style.height=mmH+'mm';
+  mapEl.style.display='block'; mapEl.style.width='100%'; mapEl.style.height=mmH+'mm';
   tgtMap.invalidateSize(false);
-  if(tgtLine){ try{ tgtMap.fitBounds(tgtLine.getBounds(),{padding:[12,12],animate:false}); }catch(e){} }
+  const range=(opts&&opts.range)||'screen';
+  const applyRange=()=>{
+    try{
+      if(range==='screen'){ tgtMap.fitBounds(screenBounds,{padding:[0,0],animate:false}); return; }
+      const markers=(mode==='car'?carMarkers:mapMarkers)||[];
+      let ll=markers.map(mk=>mk.getLatLng());
+      if(range==='core'){
+        const far=[PM['046'],CAR_HOME].filter(Boolean);
+        const core=ll.filter(p=>!far.some(f=>Math.abs(f.lat-p.lat)<1e-6&&Math.abs(f.lng-p.lng)<1e-6));
+        if(core.length) ll=core;
+      }
+      if(ll.length>=2) tgtMap.fitBounds(L.latLngBounds(ll),{paddingTopLeft:[20,20],paddingBottomRight:[mapLabelMode==='none'?20:150,20],maxZoom:17,animate:false});
+      else if(ll.length===1) tgtMap.setView(ll[0],16,{animate:false});
+      else if(tgtLine) tgtMap.fitBounds(tgtLine.getBounds(),{padding:[12,12],animate:false});
+    }catch(e){}
+  };
+  applyRange();
 
   const restore=()=>{
     document.body.classList.remove('printing');
@@ -2700,12 +2797,13 @@ function doPrint(mode){
     if(origNext) origParent.insertBefore(mapEl, origNext); else origParent.appendChild(mapEl);
     mapEl.style.display=origDisp; mapEl.style.height=origH; mapEl.style.width=origW;
     area.innerHTML='';
-    if(tgtMap) setTimeout(()=>{ tgtMap.invalidateSize(); if(tgtLine){try{tgtMap.fitBounds(tgtLine.getBounds(),{padding:[20,20]});}catch(e){}} },150);
+    if(tgtMap) setTimeout(()=>{ tgtMap.invalidateSize(); try{tgtMap.fitBounds(screenBounds,{padding:[0,0],animate:false});}catch(e){} },150);   // 画面の表示範囲に戻す
   };
 
   // タイル描画を待ってから印刷（白地図防止）
   setTimeout(()=>{
     tgtMap.invalidateSize(false);
+    applyRange();
     document.body.classList.add('printing');
     window.print();
     setTimeout(restore, 700);
